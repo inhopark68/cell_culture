@@ -53,8 +53,6 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
       TextEditingController(text: '10');
 
   final TextEditingController notesController = TextEditingController();
-
-  // Custom blocking buffer
   final TextEditingController customBlockingBufferController =
       TextEditingController();
 
@@ -271,32 +269,116 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
     return resized;
   }
 
-  void updateStandardReplicate(String value) {
+  bool _hasTrimmedStandardData(int newCount) {
+    for (final row in standards) {
+      if (row.absorbances.length > newCount) {
+        final trimmed = row.absorbances.sublist(newCount);
+        if (trimmed.any((e) => e != 0)) return true;
+      }
+    }
+    return false;
+  }
+
+  bool _hasTrimmedSampleData(int newCount) {
+    for (final row in samples) {
+      if (row.absorbances.length > newCount) {
+        final trimmed = row.absorbances.sublist(newCount);
+        if (trimmed.any((e) => e != 0)) return true;
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _confirmReplicateReduction({
+    required String title,
+    required String message,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('변경'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
+  Future<void> updateStandardReplicate(String value) async {
+    final newCount = switch (value) {
+      'Single' => 1,
+      'Duplicate' => 2,
+      _ => 3,
+    };
+
+    if (newCount < standardReplicateCount &&
+        _hasTrimmedStandardData(newCount)) {
+      final confirmed = await _confirmReplicateReduction(
+        title: 'Standard replicate 변경',
+        message:
+            '현재 standard의 뒤쪽 well 데이터가 입력되어 있습니다.\n'
+            '$selectedStandardReplicate $standardWellLabel 에서 '
+            '$value ${_wellLabel(newCount)} 로 변경하면 일부 absorbance 값이 삭제됩니다.\n\n'
+            '계속하시겠습니까?',
+      );
+
+      if (!confirmed) return;
+    }
+
+    if (!mounted) return;
+
     setState(() {
       selectedStandardReplicate = value;
       standards = standards
           .map(
             (e) => e.copyWith(
-              absorbances: resizeAbsorbances(
-                e.absorbances,
-                standardReplicateCount,
-              ),
+              absorbances: resizeAbsorbances(e.absorbances, newCount),
             ),
           )
           .toList();
     });
   }
 
-  void updateSampleReplicate(String value) {
+  Future<void> updateSampleReplicate(String value) async {
+    final newCount = switch (value) {
+      'Single' => 1,
+      'Duplicate' => 2,
+      _ => 3,
+    };
+
+    if (newCount < sampleReplicateCount && _hasTrimmedSampleData(newCount)) {
+      final confirmed = await _confirmReplicateReduction(
+        title: 'Sample replicate 변경',
+        message:
+            '현재 sample의 뒤쪽 well 데이터가 입력되어 있습니다.\n'
+            '$selectedSampleReplicate $sampleWellLabel 에서 '
+            '$value ${_wellLabel(newCount)} 로 변경하면 일부 absorbance 값이 삭제됩니다.\n\n'
+            '계속하시겠습니까?',
+      );
+
+      if (!confirmed) return;
+    }
+
+    if (!mounted) return;
+
     setState(() {
       selectedSampleReplicate = value;
       samples = samples
           .map(
             (e) => e.copyWith(
-              absorbances: resizeAbsorbances(
-                e.absorbances,
-                sampleReplicateCount,
-              ),
+              absorbances: resizeAbsorbances(e.absorbances, newCount),
             ),
           )
           .toList();
