@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'pages/pcr_template.dart';
 import 'pages/cell_culture_template.dart';
 import 'pages/elisa_template.dart';
+import 'pages/mrna_cdna_template.dart';
+import 'pages/western_blot_template.dart';
 
 void main() {
   runApp(const LabTemplateApp());
@@ -38,16 +40,30 @@ class TemplateHomePage extends StatelessWidget {
           children: [
             _menuButton(
               context: context,
-              title: 'PCR Template',
-              icon: Icons.science,
-              page: const PcrTemplatePage(),
+              title: 'Cell Culture Template',
+              icon: Icons.biotech,
+              page: const CellCultureTemplatePage(),
             ),
             const SizedBox(height: 12),
             _menuButton(
               context: context,
-              title: 'Cell Culture Template',
-              icon: Icons.biotech,
-              page: const CellCultureTemplatePage(),
+              title: 'Western Blot Template',
+              icon: Icons.blur_on,
+              page: const WesternBlotTemplatePage(),
+            ),
+            const SizedBox(height: 12),
+            _menuButton(
+              context: context,
+              title: 'mRNA → cDNA Template',
+              icon: Icons.medical_information,
+              page: const MrnaCdnaTemplatePage(),
+            ),
+            const SizedBox(height: 12),
+            _menuButton(
+              context: context,
+              title: 'PCR Template',
+              icon: Icons.science,
+              page: const PcrTemplatePage(),
             ),
             const SizedBox(height: 12),
             _menuButton(

@@ -1,5 +1,11 @@
+import 'dart:io';
 import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../models/plate_drag_data.dart';
 import '../services/elisa_calculator.dart';
 import '../services/elisa_layout_service.dart';
@@ -141,9 +147,7 @@ class _ElisaTemplatePageState extends State<ElisaTemplatePage> {
     for (int i = 0; i < standardCount; i++) {
       values.add(
         standardTopConcentration /
-            (i == 0
-                ? 1
-                : math.pow(standardDilutionFactor, i)),
+            (i == 0 ? 1 : math.pow(standardDilutionFactor, i)),
       );
     }
     return values;
@@ -338,42 +342,124 @@ class _ElisaTemplatePageState extends State<ElisaTemplatePage> {
   // Export
   // =========================
   Future<void> exportToExcel() async {
-    final path = await ElisaExcelService.export(
-      experimentId: experimentIdController.text.trim(),
-      assayName: assayNameController.text.trim(),
-      targetAnalyte: targetAnalyteController.text.trim(),
-      operatorName: operatorNameController.text.trim(),
-      plateType: selectedPlateType,
-      sampleCount: sampleCount,
-      sampleReplicateCount: sampleReplicateCount,
-      blankCount: blankCount,
-      negativeControlCount: negativeControlCount,
-      positiveControlCount: positiveControlCount,
-      standardCount: standardCount,
-      standardReplicateCount: standardReplicateCount,
-      volumePerWell: volumePerWell,
-      extraPercent: extraPercent,
-      totalSampleWells: totalSampleWells,
-      totalControlWells: totalControlWells,
-      totalWells: totalWells,
-      totalVolumeNeeded: totalVolumeNeeded,
-      dilutionFactor: dilutionFactor,
-      targetDilutionVolume: targetDilutionVolume,
-      stockVolumeForDilution: stockVolumeForDilution,
-      diluentVolumeForDilution: diluentVolumeForDilution,
-      standardTopConcentration: standardTopConcentration,
-      standardDilutionFactor: standardDilutionFactor,
-      standardCurveConcentrations: standardCurveConcentrations,
-      layout: editablePlateLayout,
-    );
+    try {
+      final path = await ElisaExcelService.export(
+        experimentId: experimentIdController.text.trim(),
+        assayName: assayNameController.text.trim(),
+        targetAnalyte: targetAnalyteController.text.trim(),
+        operatorName: operatorNameController.text.trim(),
+        plateType: selectedPlateType,
+        sampleCount: sampleCount,
+        sampleReplicateCount: sampleReplicateCount,
+        blankCount: blankCount,
+        negativeControlCount: negativeControlCount,
+        positiveControlCount: positiveControlCount,
+        standardCount: standardCount,
+        standardReplicateCount: standardReplicateCount,
+        volumePerWell: volumePerWell,
+        extraPercent: extraPercent,
+        totalSampleWells: totalSampleWells,
+        totalControlWells: totalControlWells,
+        totalWells: totalWells,
+        totalVolumeNeeded: totalVolumeNeeded,
+        dilutionFactor: dilutionFactor,
+        targetDilutionVolume: targetDilutionVolume,
+        stockVolumeForDilution: stockVolumeForDilution,
+        diluentVolumeForDilution: diluentVolumeForDilution,
+        standardTopConcentration: standardTopConcentration,
+        standardDilutionFactor: standardDilutionFactor,
+        standardCurveConcentrations: standardCurveConcentrations,
+        layout: editablePlateLayout,
+      );
 
-    if (!mounted) return;
+      debugPrint('Excel saved path: $path');
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(path == null ? '엑셀 저장 실패' : '엑셀 저장 완료: $path'),
-      ),
-    );
+      if (!mounted) return;
+
+      if (path == null || path.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('엑셀 저장 실패')),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: const Text('엑셀 저장 완료'),
+          action: SnackBarAction(
+            label: '열기',
+            onPressed: () async {
+              await openSavedExcelFile(path);
+            },
+          ),
+        ),
+      );
+
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('엑셀 저장 완료'),
+            content: SelectableText(path),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('닫기'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await openSavedFolder(path);
+                },
+                child: const Text('폴더 열기'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await openSavedExcelFile(path);
+                },
+                child: const Text('파일 열기'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e, st) {
+      debugPrint('Excel export error: $e');
+      debugPrint('$st');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('엑셀 저장 중 오류 발생: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> openSavedExcelFile(String path) async {
+    final result = await OpenFilex.open(path);
+    debugPrint('Open file result: ${result.type} / ${result.message}');
+  }
+
+  Future<void> openSavedFolder(String path) async {
+    final directoryPath = File(path).parent.path;
+    final uri = Uri.file(directoryPath);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      debugPrint('Could not open folder: $directoryPath');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('폴더를 열 수 없습니다: $directoryPath'),
+        ),
+      );
+    }
   }
 
   // =========================
@@ -791,220 +877,223 @@ class _ElisaTemplatePageState extends State<ElisaTemplatePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            buildSectionTitle('Experiment Information'),
-            const SizedBox(height: 8),
-            buildTextField(
-              label: 'Experiment ID',
-              controller: experimentIdController,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Assay Name',
-              controller: assayNameController,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Target Analyte',
-              controller: targetAnalyteController,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Operator',
-              controller: operatorNameController,
-            ),
-            const SizedBox(height: 20),
-
-            buildSectionTitle('Plate Setup'),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: selectedPlateType,
-              decoration: const InputDecoration(
-                labelText: 'Plate type',
-                border: OutlineInputBorder(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              buildSectionTitle('Experiment Information'),
+              const SizedBox(height: 8),
+              buildTextField(
+                label: 'Experiment ID',
+                controller: experimentIdController,
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '96-well plate',
-                  child: Text('96-well plate'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  selectedPlateType = value;
-                  autoGenerateLayout = true;
-                });
-                syncPlateLayoutFromInputs();
-              },
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Sample count',
-              controller: sampleCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Sample replicates',
-              controller: sampleReplicateCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Blank count',
-              controller: blankCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Negative control count',
-              controller: negativeControlCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Positive control count',
-              controller: positiveControlCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Standard count',
-              controller: standardCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Standard replicates',
-              controller: standardReplicateCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Volume per well (µL)',
-              controller: volumePerWellController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Extra (%)',
-              controller: extraPercentController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 20),
-
-            buildSectionTitle('Dilution Calculation'),
-            const SizedBox(height: 8),
-            buildTextField(
-              label: 'Dilution factor',
-              controller: dilutionFactorController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Target dilution volume (µL)',
-              controller: targetDilutionVolumeController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 12),
-            buildDilutionCard(),
-            const SizedBox(height: 20),
-
-            buildSectionTitle('Standard Curve'),
-            const SizedBox(height: 8),
-            buildTextField(
-              label: 'Top concentration',
-              controller: standardTopConcentrationController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Serial dilution factor',
-              controller: standardDilutionFactorController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 12),
-            buildStandardCurveCard(),
-            const SizedBox(height: 20),
-
-            buildSectionTitle('Calculated Result'),
-            const SizedBox(height: 8),
-            buildSummaryCard(),
-            const SizedBox(height: 12),
-
-            buildSectionTitle('Plate Layout'),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                autoGenerateLayout
-                    ? 'Mode: Auto-generated'
-                    : 'Mode: Manually edited',
-                style: TextStyle(
-                  color: autoGenerateLayout ? Colors.green : Colors.orange,
-                  fontWeight: FontWeight.w600,
-                ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Assay Name',
+                controller: assayNameController,
               ),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Tap: edit well  •  Long press & drag: swap wells',
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontSize: 13,
-                ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Target Analyte',
+                controller: targetAnalyteController,
               ),
-            ),
-            const SizedBox(height: 8),
-            buildLegend(),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: regenerateLayout,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Auto Regenerate'),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Operator',
+                controller: operatorNameController,
+              ),
+              const SizedBox(height: 20),
+
+              buildSectionTitle('Plate Setup'),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: selectedPlateType,
+                decoration: const InputDecoration(
+                  labelText: 'Plate type',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: '96-well plate',
+                    child: Text('96-well plate'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    selectedPlateType = value;
+                    autoGenerateLayout = true;
+                  });
+                  syncPlateLayoutFromInputs();
+                },
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Sample count',
+                controller: sampleCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Sample replicates',
+                controller: sampleReplicateCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Blank count',
+                controller: blankCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Negative control count',
+                controller: negativeControlCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Positive control count',
+                controller: positiveControlCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Standard count',
+                controller: standardCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Standard replicates',
+                controller: standardReplicateCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Volume per well (µL)',
+                controller: volumePerWellController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Extra (%)',
+                controller: extraPercentController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 20),
+
+              buildSectionTitle('Dilution Calculation'),
+              const SizedBox(height: 8),
+              buildTextField(
+                label: 'Dilution factor',
+                controller: dilutionFactorController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Target dilution volume (µL)',
+                controller: targetDilutionVolumeController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              buildDilutionCard(),
+              const SizedBox(height: 20),
+
+              buildSectionTitle('Standard Curve'),
+              const SizedBox(height: 8),
+              buildTextField(
+                label: 'Top concentration',
+                controller: standardTopConcentrationController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Serial dilution factor',
+                controller: standardDilutionFactorController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              buildStandardCurveCard(),
+              const SizedBox(height: 20),
+
+              buildSectionTitle('Calculated Result'),
+              const SizedBox(height: 8),
+              buildSummaryCard(),
+              const SizedBox(height: 12),
+
+              buildSectionTitle('Plate Layout'),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  autoGenerateLayout
+                      ? 'Mode: Auto-generated'
+                      : 'Mode: Manually edited',
+                  style: TextStyle(
+                    color: autoGenerateLayout ? Colors.green : Colors.orange,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: clearLayout,
-                    icon: const Icon(Icons.clear_all),
-                    label: const Text('Clear Layout'),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Tap: edit well  •  Long press & drag: swap wells',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 13,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            buildPlateLayoutTable(plateLayout),
-            const SizedBox(height: 12),
-
-            buildFormulaCard(),
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: exportToExcel,
-                icon: const Icon(Icons.download),
-                label: const Text('Export Excel'),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              buildLegend(),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: regenerateLayout,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Auto Regenerate'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: clearLayout,
+                      icon: const Icon(Icons.clear_all),
+                      label: const Text('Clear Layout'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              buildPlateLayoutTable(plateLayout),
+              const SizedBox(height: 12),
+
+              buildFormulaCard(),
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: exportToExcel,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Export Excel'),
+                ),
+              ),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
+            ],
+          ),
         ),
       ),
     );

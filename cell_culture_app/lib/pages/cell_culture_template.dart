@@ -3,6 +3,10 @@ import '../models/plate_drag_data.dart';
 import '../services/cell_culture_calculator.dart';
 import '../services/cell_culture_layout_service.dart';
 import '../services/cell_culture_excel_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:open_filex/open_filex.dart';
+import 'dart:io';
+import 'package:url_launcher/url_launcher.dart';
 
 class CellCultureTemplatePage extends StatefulWidget {
   const CellCultureTemplatePage({super.key});
@@ -383,50 +387,130 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   }
 
   Future<void> exportToExcel() async {
-    final path = await CellCultureExcelService.export(
-      cellLine: cellLineController.text.trim(),
-      assayType: selectedAssay,
-      cultureWare: selectedWare,
-      surfaceArea: selectedArea,
-      workingVolume: selectedVolume,
-      seedingDensity: seedingDensity,
-      sampleCount: sampleCount,
-      replicateCount: replicateCount,
-      blankCount: blankCount,
-      negativeControlCount: negativeControlCount,
-      vehicleCount: vehicleCount,
-      positiveControlCount: positiveControlCount,
-      totalControlUnits: totalControlUnits,
-      totalSampleUnits: totalSampleUnits,
-      totalCultureUnits: totalCultureUnits,
-      cellsPerUnit: cellsPerUnit,
-      totalCellsNeeded: totalCellsNeeded,
-      totalCellsNeededWithExtra: totalCellsNeededWithExtra,
-      targetConfluency: targetConfluency,
-      seedingVolumePerUnit: seedingVolumePerUnit,
-      totalSeedingVolume: totalSeedingVolume,
-      totalSeedingVolumeWithExtra: totalSeedingVolumeWithExtra,
-      stockConcentration: stockConcentration,
-      requiredCellSuspensionVolume: requiredCellSuspensionVolume,
-      requiredCellSuspensionVolumeWithExtra:
-          requiredCellSuspensionVolumeWithExtra,
-      requiredMediaVolume: requiredMediaVolume,
-      requiredMediaVolumeWithExtra: requiredMediaVolumeWithExtra,
-      extraPercent: extraPercent,
-      layout: editablePlateLayout,
-    );
+    try {
+      final path = await CellCultureExcelService.export(
+        cellLine: cellLineController.text.trim(),
+        assayType: selectedAssay,
+        cultureWare: selectedWare,
+        surfaceArea: selectedArea,
+        workingVolume: selectedVolume,
+        seedingDensity: seedingDensity,
+        sampleCount: sampleCount,
+        replicateCount: replicateCount,
+        blankCount: blankCount,
+        negativeControlCount: negativeControlCount,
+        vehicleCount: vehicleCount,
+        positiveControlCount: positiveControlCount,
+        totalControlUnits: totalControlUnits,
+        totalSampleUnits: totalSampleUnits,
+        totalCultureUnits: totalCultureUnits,
+        cellsPerUnit: cellsPerUnit,
+        totalCellsNeeded: totalCellsNeeded,
+        totalCellsNeededWithExtra: totalCellsNeededWithExtra,
+        targetConfluency: targetConfluency,
+        seedingVolumePerUnit: seedingVolumePerUnit,
+        totalSeedingVolume: totalSeedingVolume,
+        totalSeedingVolumeWithExtra: totalSeedingVolumeWithExtra,
+        stockConcentration: stockConcentration,
+        requiredCellSuspensionVolume: requiredCellSuspensionVolume,
+        requiredCellSuspensionVolumeWithExtra:
+            requiredCellSuspensionVolumeWithExtra,
+        requiredMediaVolume: requiredMediaVolume,
+        requiredMediaVolumeWithExtra: requiredMediaVolumeWithExtra,
+        extraPercent: extraPercent,
+        layout: editablePlateLayout,
+      );
 
-    if (!mounted) return;
+      debugPrint('Excel saved path: $path');
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          path == null ? '엑셀 저장 실패' : '엑셀 저장 완료: $path',
+      if (!mounted) return;
+
+      if (path == null || path.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('엑셀 저장 실패')),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: const Text('엑셀 저장 완료'),
+          action: SnackBarAction(
+            label: '열기',
+            onPressed: () async {
+              await openSavedExcelFile(path);
+            },
+          ),
         ),
-      ),
-    );
+      );
+
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('엑셀 저장 완료'),
+            content: SelectableText(path),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('닫기'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await openSavedFolder(path);
+                },
+                child: const Text('폴더 열기'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await openSavedExcelFile(path);
+                },
+                child: const Text('파일 열기'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e, st) {
+      debugPrint('Excel export error: $e');
+      debugPrint('$st');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('엑셀 저장 중 오류 발생: $e'),
+        ),
+      );
+    }
   }
 
+  Future<void> openSavedExcelFile(String path) async {
+    final result = await OpenFilex.open(path);
+    debugPrint('Open file result: ${result.type} / ${result.message}');
+  }
+
+  Future<void> openSavedFolder(String path) async {
+    final directoryPath = File(path).parent.path;
+    final uri = Uri.file(directoryPath);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      debugPrint('Could not open folder: $directoryPath');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('폴더를 열 수 없습니다: $directoryPath'),
+        ),
+      );
+    }
+  }  
+  
   Widget buildSectionTitle(String title) {
     return Align(
       alignment: Alignment.centerLeft,
@@ -856,9 +940,10 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
           children: [
             buildSectionTitle('Basic Information'),
             const SizedBox(height: 8),
@@ -1064,7 +1149,9 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                 label: const Text('Export Excel'),
               ),
             ),
-          ],
+            const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );

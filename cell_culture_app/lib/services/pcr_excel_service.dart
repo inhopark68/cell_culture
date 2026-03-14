@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:excel/excel.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -54,7 +55,9 @@ class PcrExcelService {
     void setDouble(Sheet sheet, String cell, double value) {
       sheet.cell(CellIndex.indexByString(cell)).value = DoubleCellValue(value);
     }
-    setText(calcSheet, 'A1', 'PCR Experiment');
+
+    // PCR_Calculation sheet
+    setText(calcSheet, 'A1', 'PCR Triplicate Calculator');
 
     setText(calcSheet, 'A3', 'Experiment ID');
     setText(calcSheet, 'B3', experimentId);
@@ -74,87 +77,94 @@ class PcrExcelService {
     setText(calcSheet, 'A8', 'Date');
     setText(calcSheet, 'B8', DateTime.now().toString());
 
-    setText(calcSheet, 'A1', 'PCR Triplicate Calculator');
+    setText(calcSheet, 'A10', 'Plate type');
+    setText(calcSheet, 'B10', plateType);
 
-    setText(calcSheet, 'A3', 'Plate type');
-    setText(calcSheet, 'B3', plateType);
+    setText(calcSheet, 'A11', 'Sample count');
+    setInt(calcSheet, 'B11', sampleCount);
 
-    setText(calcSheet, 'A4', 'Sample count');
-    setInt(calcSheet, 'B4', sampleCount);
+    setText(calcSheet, 'A12', 'Replicates');
+    setInt(calcSheet, 'B12', replicateCount);
 
-    setText(calcSheet, 'A5', 'Replicates');
-    setInt(calcSheet, 'B5', replicateCount);
+    setText(calcSheet, 'A13', 'NTC count');
+    setInt(calcSheet, 'B13', ntcCount);
 
-    setText(calcSheet, 'A6', 'NTC count');
-    setInt(calcSheet, 'B6', ntcCount);
+    setText(calcSheet, 'A14', 'Positive control count');
+    setInt(calcSheet, 'B14', positiveControlCount);
 
-    setText(calcSheet, 'A7', 'Positive control count');
-    setInt(calcSheet, 'B7', positiveControlCount);
+    setText(calcSheet, 'A15', 'Standard count');
+    setInt(calcSheet, 'B15', standardCount);
 
-    setText(calcSheet, 'A8', 'Standard count');
-    setInt(calcSheet, 'B8', standardCount);
+    setText(calcSheet, 'A16', 'Extra (%)');
+    setDouble(calcSheet, 'B16', extraPercent * 100);
 
-    setText(calcSheet, 'A9', 'Extra (%)');
-    setDouble(calcSheet, 'B9', extraPercent * 100);
+    setText(calcSheet, 'A18', 'Total wells');
+    setInt(calcSheet, 'B18', totalWells);
 
-    setText(calcSheet, 'A11', 'Total wells');
-    setInt(calcSheet, 'B11', totalWells);
+    setText(calcSheet, 'A19', 'Mix reaction count');
+    setInt(calcSheet, 'B19', mixReactionCount);
 
-    setText(calcSheet, 'A12', 'Mix reaction count');
-    setInt(calcSheet, 'B12', mixReactionCount);
+    setText(calcSheet, 'A21', 'Reaction volume (uL)');
+    setDouble(calcSheet, 'B21', reactionVolume);
 
-    setText(calcSheet, 'A14', 'Reaction volume (uL)');
-    setDouble(calcSheet, 'B14', reactionVolume);
+    setText(calcSheet, 'A22', '2X Master Mix / rxn');
+    setDouble(calcSheet, 'B22', masterMix2x);
 
-    setText(calcSheet, 'A15', '2X Master Mix / rxn');
-    setDouble(calcSheet, 'B15', masterMix2x);
+    setText(calcSheet, 'A23', 'Forward Primer / rxn');
+    setDouble(calcSheet, 'B23', forwardPrimer);
 
-    setText(calcSheet, 'A16', 'Forward Primer / rxn');
-    setDouble(calcSheet, 'B16', forwardPrimer);
+    setText(calcSheet, 'A24', 'Reverse Primer / rxn');
+    setDouble(calcSheet, 'B24', reversePrimer);
 
-    setText(calcSheet, 'A17', 'Reverse Primer / rxn');
-    setDouble(calcSheet, 'B17', reversePrimer);
+    setText(calcSheet, 'A25', 'Template / rxn');
+    setDouble(calcSheet, 'B25', templateVolume);
 
-    setText(calcSheet, 'A18', 'Template / rxn');
-    setDouble(calcSheet, 'B18', templateVolume);
+    setText(calcSheet, 'A26', 'Water / rxn');
+    setDouble(calcSheet, 'B26', waterPerReaction);
 
-    setText(calcSheet, 'A19', 'Water / rxn');
-    setDouble(calcSheet, 'B19', waterPerReaction);
+    setText(calcSheet, 'A27', 'Master mix / well');
+    setDouble(calcSheet, 'B27', masterMixPerReaction);
 
-    setText(calcSheet, 'A20', 'Master mix / well');
-    setDouble(calcSheet, 'B20', masterMixPerReaction);
+    setText(calcSheet, 'A29', '2X Master Mix total');
+    setDouble(calcSheet, 'B29', totalMasterMix2x);
 
-    setText(calcSheet, 'A22', '2X Master Mix total');
-    setDouble(calcSheet, 'B22', totalMasterMix2x);
+    setText(calcSheet, 'A30', 'Forward Primer total');
+    setDouble(calcSheet, 'B30', totalForwardPrimer);
 
-    setText(calcSheet, 'A23', 'Forward Primer total');
-    setDouble(calcSheet, 'B23', totalForwardPrimer);
+    setText(calcSheet, 'A31', 'Reverse Primer total');
+    setDouble(calcSheet, 'B31', totalReversePrimer);
 
-    setText(calcSheet, 'A24', 'Reverse Primer total');
-    setDouble(calcSheet, 'B24', totalReversePrimer);
+    setText(calcSheet, 'A32', 'Water total');
+    setDouble(calcSheet, 'B32', totalWater);
 
-    setText(calcSheet, 'A25', 'Water total');
-    setDouble(calcSheet, 'B25', totalWater);
+    setText(calcSheet, 'A33', 'Template total');
+    setDouble(calcSheet, 'B33', totalTemplate);
 
-    setText(calcSheet, 'A26', 'Template total');
-    setDouble(calcSheet, 'B26', totalTemplate);
-
+    // PCR_Input sheet
     setText(inputSheet, 'A1', 'PCR Input Summary');
+
     setText(inputSheet, 'A3', 'Plate type');
     setText(inputSheet, 'B3', plateType);
+
     setText(inputSheet, 'A4', 'Sample count');
     setInt(inputSheet, 'B4', sampleCount);
+
     setText(inputSheet, 'A5', 'Replicates');
     setInt(inputSheet, 'B5', replicateCount);
+
     setText(inputSheet, 'A6', 'NTC count');
     setInt(inputSheet, 'B6', ntcCount);
+
     setText(inputSheet, 'A7', 'Positive control count');
     setInt(inputSheet, 'B7', positiveControlCount);
+
     setText(inputSheet, 'A8', 'Standard count');
     setInt(inputSheet, 'B8', standardCount);
+
     setText(inputSheet, 'A9', 'Extra (%)');
     setDouble(inputSheet, 'B9', extraPercent * 100);
 
+    // PCR_Layout sheet
     if (layout.isNotEmpty && layout.first.isNotEmpty) {
       setText(layoutSheet, 'A1', 'PCR Plate Layout');
 
@@ -175,10 +185,12 @@ class PcrExcelService {
         for (int c = 0; c < colCount; c++) {
           final value = layout[r][c].isEmpty ? '-' : layout[r][c];
           layoutSheet
-              .cell(CellIndex.indexByColumnRow(
-                columnIndex: c + 1,
-                rowIndex: r + 2,
-              ))
+              .cell(
+                CellIndex.indexByColumnRow(
+                  columnIndex: c + 1,
+                  rowIndex: r + 2,
+                ),
+              )
               .value = TextCellValue(value);
         }
       }

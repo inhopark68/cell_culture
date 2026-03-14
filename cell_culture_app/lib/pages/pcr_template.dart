@@ -1,8 +1,14 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../models/plate_drag_data.dart';
 import '../services/pcr_calculator.dart';
-import '../services/pcr_layout_service.dart';
 import '../services/pcr_excel_service.dart';
+import '../services/pcr_layout_service.dart';
 
 class PcrTemplatePage extends StatefulWidget {
   const PcrTemplatePage({super.key});
@@ -36,22 +42,11 @@ class _PcrTemplatePageState extends State<PcrTemplatePage> {
   final TextEditingController templateVolumeController =
       TextEditingController(text: '2');
 
-  final TextEditingController experimentIdController =
-      TextEditingController();
-
-  final TextEditingController targetGeneController =
-      TextEditingController();
-
-  final TextEditingController primerNameController =
-      TextEditingController();
-
-  final TextEditingController operatorController =
-      TextEditingController();
-
-  final TextEditingController instrumentController =
-      TextEditingController();
-
-
+  final TextEditingController experimentIdController = TextEditingController();
+  final TextEditingController targetGeneController = TextEditingController();
+  final TextEditingController primerNameController = TextEditingController();
+  final TextEditingController operatorController = TextEditingController();
+  final TextEditingController instrumentController = TextEditingController();
 
   String selectedPlateType = '96-well plate';
 
@@ -303,43 +298,125 @@ class _PcrTemplatePageState extends State<PcrTemplatePage> {
   }
 
   Future<void> exportToExcel() async {
-    final path = await PcrExcelService.export(
-      plateType: selectedPlateType,
-      sampleCount: sampleCount,
-      replicateCount: replicateCount,
-      ntcCount: ntcCount,
-      positiveControlCount: positiveControlCount,
-      standardCount: standardCount,
-      extraPercent: extraPercent,
-      reactionVolume: reactionVolume,
-      masterMix2x: masterMix2x,
-      forwardPrimer: forwardPrimer,
-      reversePrimer: reversePrimer,
-      templateVolume: templateVolume,
-      waterPerReaction: waterPerReaction,
-      masterMixPerReaction: masterMixPerReaction,
-      totalWells: totalWells,
-      mixReactionCount: mixReactionCount,
-      totalMasterMix2x: totalMasterMix2x,
-      totalForwardPrimer: totalForwardPrimer,
-      totalReversePrimer: totalReversePrimer,
-      totalWater: totalWater,
-      totalTemplate: totalTemplate,
-      layout: editablePlateLayout,
-      experimentId: experimentIdController.text,
-      targetGene: targetGeneController.text,
-      primerName: primerNameController.text,
-      operator: operatorController.text,
-      instrument: instrumentController.text,
-    );
+    try {
+      final path = await PcrExcelService.export(
+        plateType: selectedPlateType,
+        sampleCount: sampleCount,
+        replicateCount: replicateCount,
+        ntcCount: ntcCount,
+        positiveControlCount: positiveControlCount,
+        standardCount: standardCount,
+        extraPercent: extraPercent,
+        reactionVolume: reactionVolume,
+        masterMix2x: masterMix2x,
+        forwardPrimer: forwardPrimer,
+        reversePrimer: reversePrimer,
+        templateVolume: templateVolume,
+        waterPerReaction: waterPerReaction,
+        masterMixPerReaction: masterMixPerReaction,
+        totalWells: totalWells,
+        mixReactionCount: mixReactionCount,
+        totalMasterMix2x: totalMasterMix2x,
+        totalForwardPrimer: totalForwardPrimer,
+        totalReversePrimer: totalReversePrimer,
+        totalWater: totalWater,
+        totalTemplate: totalTemplate,
+        layout: editablePlateLayout,
+        experimentId: experimentIdController.text.trim(),
+        targetGene: targetGeneController.text.trim(),
+        primerName: primerNameController.text.trim(),
+        operator: operatorController.text.trim(),
+        instrument: instrumentController.text.trim(),
+      );
 
-    if (!mounted) return;
+      debugPrint('Excel saved path: $path');
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(path == null ? '엑셀 저장 실패' : '엑셀 저장 완료: $path'),
-      ),
-    );
+      if (!mounted) return;
+
+      if (path == null || path.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('엑셀 저장 실패')),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 8),
+          content: const Text('엑셀 저장 완료'),
+          action: SnackBarAction(
+            label: '열기',
+            onPressed: () async {
+              await openSavedExcelFile(path);
+            },
+          ),
+        ),
+      );
+
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('엑셀 저장 완료'),
+            content: SelectableText(path),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('닫기'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await openSavedFolder(path);
+                },
+                child: const Text('폴더 열기'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  await openSavedExcelFile(path);
+                },
+                child: const Text('파일 열기'),
+              ),
+            ],
+          );
+        },
+      );
+    } catch (e, st) {
+      debugPrint('Excel export error: $e');
+      debugPrint('$st');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('엑셀 저장 중 오류 발생: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> openSavedExcelFile(String path) async {
+    final result = await OpenFilex.open(path);
+    debugPrint('Open file result: ${result.type} / ${result.message}');
+  }
+
+  Future<void> openSavedFolder(String path) async {
+    final directoryPath = File(path).parent.path;
+    final uri = Uri.file(directoryPath);
+
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    } else {
+      debugPrint('Could not open folder: $directoryPath');
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('폴더를 열 수 없습니다: $directoryPath'),
+        ),
+      );
+    }
   }
 
   String _wellName(int row, int col) {
@@ -712,6 +789,13 @@ class _PcrTemplatePageState extends State<PcrTemplatePage> {
     forwardPrimerController.dispose();
     reversePrimerController.dispose();
     templateVolumeController.dispose();
+
+    experimentIdController.dispose();
+    targetGeneController.dispose();
+    primerNameController.dispose();
+    operatorController.dispose();
+    instrumentController.dispose();
+
     super.dispose();
   }
 
@@ -730,227 +814,221 @@ class _PcrTemplatePageState extends State<PcrTemplatePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            buildSectionTitle('Basic Information'),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: selectedPlateType,
-              decoration: const InputDecoration(
-                labelText: 'Plate type',
-                border: OutlineInputBorder(),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              buildSectionTitle('Basic Information'),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: selectedPlateType,
+                decoration: const InputDecoration(
+                  labelText: 'Plate type',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: '96-well plate',
+                    child: Text('96-well plate'),
+                  ),
+                  DropdownMenuItem(
+                    value: '384-well plate',
+                    child: Text('384-well plate'),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    selectedPlateType = value;
+                    autoGenerateLayout = true;
+                  });
+                  syncPlateLayoutFromInputs();
+                },
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: '96-well plate',
-                  child: Text('96-well plate'),
-                ),
-                DropdownMenuItem(
-                  value: '384-well plate',
-                  child: Text('384-well plate'),
-                ),
-              ],
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() {
-                  selectedPlateType = value;
-                  autoGenerateLayout = true;
-                });
-                syncPlateLayoutFromInputs();
-              },
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            buildSectionTitle('Plate Setup'),
-            const SizedBox(height: 8),
-            buildTextField(
-              label: 'Sample count',
-              controller: sampleCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Replicates',
-              controller: replicateController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'NTC count',
-              controller: ntcCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Positive control count',
-              controller: positiveControlCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Standard count',
-              controller: standardCountController,
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Extra (%)',
-              controller: extraPercentController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 20),
-
-            buildSectionTitle('Reaction Composition'),
-            const SizedBox(height: 8),
-            buildTextField(
-              label: 'Reaction volume (µL)',
-              controller: reactionVolumeController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: '2X Master Mix (µL)',
-              controller: masterMix2xController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Forward Primer (µL)',
-              controller: forwardPrimerController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Reverse Primer (µL)',
-              controller: reversePrimerController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 12),
-            buildTextField(
-              label: 'Template (µL)',
-              controller: templateVolumeController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-            ),
-            const SizedBox(height: 20),
-
-            buildSectionTitle('Calculated Result'),
-            const SizedBox(height: 8),
-            buildSummaryCard(),
-            const SizedBox(height: 12),
-
-            buildSectionTitle('Master Mix Preparation'),
-            const SizedBox(height: 8),
-            buildReagentCard(),
-            const SizedBox(height: 12),
-
-            buildSectionTitle('Plate Layout'),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                autoGenerateLayout
-                    ? 'Mode: Auto-generated'
-                    : 'Mode: Manually edited',
-                style: TextStyle(
-                  color: autoGenerateLayout ? Colors.green : Colors.orange,
-                  fontWeight: FontWeight.w600,
-                ),
+              buildSectionTitle('Plate Setup'),
+              const SizedBox(height: 8),
+              buildTextField(
+                label: 'Sample count',
+                controller: sampleCountController,
+                keyboardType: TextInputType.number,
               ),
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Tap: edit well  •  Long press & drag: swap wells',
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                  fontSize: 13,
-                ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Replicates',
+                controller: replicateController,
+                keyboardType: TextInputType.number,
               ),
-            ),
-            const SizedBox(height: 8),
-            buildLegend(),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: regenerateLayout,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Auto Regenerate'),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'NTC count',
+                controller: ntcCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Positive control count',
+                controller: positiveControlCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Standard count',
+                controller: standardCountController,
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Extra (%)',
+                controller: extraPercentController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 20),
+
+              buildSectionTitle('Reaction Composition'),
+              const SizedBox(height: 8),
+              buildTextField(
+                label: 'Reaction volume (µL)',
+                controller: reactionVolumeController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: '2X Master Mix (µL)',
+                controller: masterMix2xController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Forward Primer (µL)',
+                controller: forwardPrimerController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Reverse Primer (µL)',
+                controller: reversePrimerController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Template (µL)',
+                controller: templateVolumeController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 20),
+
+              buildSectionTitle('Experiment Information'),
+              const SizedBox(height: 8),
+              buildTextField(
+                label: 'Experiment ID',
+                controller: experimentIdController,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Target Gene',
+                controller: targetGeneController,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Primer Name',
+                controller: primerNameController,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Operator',
+                controller: operatorController,
+              ),
+              const SizedBox(height: 12),
+              buildTextField(
+                label: 'Instrument',
+                controller: instrumentController,
+              ),
+              const SizedBox(height: 20),
+
+              buildSectionTitle('Calculated Result'),
+              const SizedBox(height: 8),
+              buildSummaryCard(),
+              const SizedBox(height: 12),
+
+              buildSectionTitle('Master Mix Preparation'),
+              const SizedBox(height: 8),
+              buildReagentCard(),
+              const SizedBox(height: 12),
+
+              buildSectionTitle('Plate Layout'),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  autoGenerateLayout
+                      ? 'Mode: Auto-generated'
+                      : 'Mode: Manually edited',
+                  style: TextStyle(
+                    color: autoGenerateLayout ? Colors.green : Colors.orange,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: clearLayout,
-                    icon: const Icon(Icons.clear_all),
-                    label: const Text('Clear Layout'),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Tap: edit well  •  Long press & drag: swap wells',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 13,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            buildPlateLayoutTable(plateLayout),
-            const SizedBox(height: 12),
-
-            buildFormulaCard(),
-            const SizedBox(height: 20),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: exportToExcel,
-                icon: const Icon(Icons.download),
-                label: const Text('Export Excel'),
               ),
-            ),
-            buildSectionTitle('Experiment Information'),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
+              buildLegend(),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: regenerateLayout,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Auto Regenerate'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: clearLayout,
+                      icon: const Icon(Icons.clear_all),
+                      label: const Text('Clear Layout'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              buildPlateLayoutTable(plateLayout),
+              const SizedBox(height: 12),
 
-            buildTextField(
-              label: 'Experiment ID',
-              controller: experimentIdController,
-            ),
+              buildFormulaCard(),
+              const SizedBox(height: 20),
 
-            const SizedBox(height: 12),
-
-            buildTextField(
-              label: 'Target Gene',
-              controller: targetGeneController,
-            ),
-
-            const SizedBox(height: 12),
-
-            buildTextField(
-              label: 'Primer Name',
-              controller: primerNameController,
-            ),
-
-            const SizedBox(height: 12),
-
-            buildTextField(
-              label: 'Operator',
-              controller: operatorController,
-            ),
-
-            const SizedBox(height: 12),
-
-            buildTextField(
-              label: 'Instrument',
-              controller: instrumentController,
-            ),
-
-            const SizedBox(height: 20),
-          ],
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: exportToExcel,
+                  icon: const Icon(Icons.download),
+                  label: const Text('Export Excel'),
+                ),
+              ),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
+            ],
+          ),
         ),
       ),
     );
