@@ -1,0 +1,5 @@
+dependencies:
+  flutter:
+    sdk: flutter
+  excel: ^4.0.3
+  path_provider: ^2.1.4
