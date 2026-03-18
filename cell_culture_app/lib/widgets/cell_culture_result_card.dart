@@ -3,33 +3,61 @@ import 'package:flutter/material.dart';
 import '../models/cell_culture_form_data.dart';
 import '../models/cell_culture_summary.dart';
 import '../models/cell_line_option.dart';
+import '../models/seeding_input_mode.dart';
 
 class CellCultureResultCard extends StatelessWidget {
   final CellCultureFormData form;
   final CellCultureSummary summary;
   final CellLineOption? selectedCellLine;
 
+  final SeedingInputMode selectedSeedingInputMode;
+  final String selectedWellBasisWare;
+  final double? basisCellsPerWell;
+  final double? actualCellsPerCultureUnit;
+
   const CellCultureResultCard({
     super.key,
     required this.form,
     required this.summary,
     required this.selectedCellLine,
+    required this.selectedSeedingInputMode,
+    required this.selectedWellBasisWare,
+    required this.basisCellsPerWell,
+    required this.actualCellsPerCultureUnit,
   });
+
+  String _f0(num? value) {
+    if (value == null) return '-';
+    return value.toStringAsFixed(0);
+  }
+
+  String _f1(num? value) {
+    if (value == null) return '-';
+    return value.toStringAsFixed(1);
+  }
+
+  String _f2(num? value) {
+    if (value == null) return '-';
+    return value.toStringAsFixed(2);
+  }
 
   Widget _row(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Text(label)),
+          Expanded(
+            flex: 5,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
+            flex: 6,
+            child: Text(value),
           ),
         ],
       ),
@@ -38,30 +66,51 @@ class CellCultureResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final normalizedDensity = form.seedingDensity;
+    final inputModeLabel = selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
+        ? 'cells/cm²'
+        : 'cells/well';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _row('Cell line', selectedCellLine?.displayLabel ?? 'Not selected'),
-            _row('Assay type', form.selectedAssay),
+            _row('Cell line', selectedCellLine?.displayLabel ?? '-'),
+            _row('Assay', form.selectedAssay),
             _row('Culture ware', form.selectedWare),
-            _row('Surface area', '${summary.surfaceArea.toStringAsFixed(2)} cm²'),
-            _row('Working volume', summary.workingVolume),
-            _row('Seeding density', '${form.seedingDensity.toStringAsFixed(0)} cells/cm²'),
-            _row('Target confluency', '${form.targetConfluency} %'),
-            _row('Cells / unit', '${summary.cellsPerUnit} cells'),
-            _row('Sample count', '${form.sampleCount}'),
-            _row('Replicates', '${form.replicateCount}'),
-            _row('Blank', '${form.blankCount}'),
-            _row('Negative control', '${form.negativeControlCount}'),
-            _row('Vehicle', '${form.vehicleCount}'),
-            _row('Positive control', '${form.positiveControlCount}'),
-            _row('Total controls', '${summary.totalControlUnits}'),
-            _row('Total sample units', '${summary.totalSampleUnits}'),
-            _row('Total culture units', '${summary.totalCultureUnits}'),
-            _row('Total cells needed', '${summary.totalCellsNeeded} cells'),
-            _row('Total cells needed (+extra)', '${summary.totalCellsNeededWithExtra} cells'),
+
+            const Divider(height: 24),
+
+            _row('Input mode', inputModeLabel),
+            _row('Normalized seeding density', '${_f2(normalizedDensity)} cells/cm²'),
+            _row(
+              'Input basis',
+              '${_f0(basisCellsPerWell)} cells/well ($selectedWellBasisWare)',
+            ),
+            _row(
+              'Actual per culture well',
+              '${_f0(actualCellsPerCultureUnit)} cells/well (${form.selectedWare})',
+            ),
+
+            const Divider(height: 24),
+
+            _row('Surface area', '${_f2(summary.surfaceArea)} cm²'),
+            _row('Working volume', '${summary.workingVolume} mL'),
+            _row('Sample units', _f0(summary.totalSampleUnits)),
+            _row('Control units', _f0(summary.totalControlUnits)),
+            _row('Total culture units', _f0(summary.totalCultureUnits)),
+            _row('Cells per unit', _f0(summary.cellsPerUnit)),
+            _row('Total cells needed', _f0(summary.totalCellsNeeded)),
+            _row(
+              'Total cells needed (+extra)',
+              _f0(summary.totalCellsNeededWithExtra),
+            ),
+            _row('Total seeding volume', '${_f2(summary.totalSeedingVolume)} mL'),
+            _row(
+              'Total seeding volume (+extra)',
+              '${_f2(summary.totalSeedingVolumeWithExtra)} mL',
+            ),
           ],
         ),
       ),

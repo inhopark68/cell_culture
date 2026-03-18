@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -18,6 +19,8 @@ import '../widgets/cell_culture_recommended_density_card.dart';
 import '../widgets/cell_culture_result_card.dart';
 import '../widgets/cell_culture_selected_cell_line_card.dart';
 import '../widgets/cell_culture_suspension_card.dart';
+import '../models/seeding_input_mode.dart';
+
 
 class CellCultureTemplatePage extends StatefulWidget {
   const CellCultureTemplatePage({super.key});
@@ -31,7 +34,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   final _formKey = GlobalKey<FormState>();
   final controllerVm = CellCultureTemplateController();
 
-  final TextEditingController seedingDensityController =
+  final TextEditingController seedingInputController =
       TextEditingController(text: '50000');
   final TextEditingController sampleCountController =
       TextEditingController(text: '4');
@@ -58,6 +61,9 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   String selectedAssay = 'qPCR';
   String selectedWare = '24-well plate';
 
+  SeedingInputMode selectedSeedingInputMode = SeedingInputMode.cellsPerCm2;
+  String selectedWellBasisWare = '24-well plate';
+
   String selectedSourceFilter = 'All';
   String selectedSpeciesFilter = 'All';
 
@@ -80,10 +86,40 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   CellLineOption? selectedCellLine;
   bool isLoadingCellLines = true;
 
+  double get currentSurfaceArea =>
+      controllerVm.cultureWareAreaMap[selectedWare] ?? 1.0;
+
+  double get selectedWellBasisArea =>
+      controllerVm.cultureWareAreaMap[selectedWellBasisWare] ?? 1.0;
+
+  double? get normalizedSeedingDensity {
+    final raw = double.tryParse(seedingInputController.text.trim());
+    if (raw == null || raw <= 0) return null;
+
+    switch (selectedSeedingInputMode) {
+      case SeedingInputMode.cellsPerCm2:
+        return raw;
+      case SeedingInputMode.cellsPerWell:
+        return raw / selectedWellBasisArea;
+    }
+  }
+
+  double? get basisCellsPerWell {
+    final density = normalizedSeedingDensity;
+    if (density == null) return null;
+    return density * selectedWellBasisArea;
+  }
+
+  double? get actualCellsPerCultureUnit {
+    final density = normalizedSeedingDensity;
+    if (density == null) return null;
+    return density * currentSurfaceArea;
+  }
+
   CellCultureFormData get formData => CellCultureFormData.fromRaw(
         selectedAssay: selectedAssay,
         selectedWare: selectedWare,
-        seedingDensityText: seedingDensityController.text,
+        seedingDensityText: (normalizedSeedingDensity ?? 0).toString(),
         sampleCountText: sampleCountController.text,
         replicateText: replicateController.text,
         targetConfluencyText: targetConfluencyController.text,
@@ -194,16 +230,32 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
 
     if (recommended == null) return;
 
-    final current = double.tryParse(seedingDensityController.text);
+    final current = double.tryParse(seedingInputController.text);
     if (force || current == null || current <= 0) {
-      seedingDensityController.text = recommended.toStringAsFixed(0);
+      final displayValue =
+          selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
+              ? recommended
+              : recommended * selectedWellBasisArea;
+
+      seedingInputController.text =
+          selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
+              ? displayValue.toStringAsFixed(0)
+              : displayValue.toStringAsFixed(0);
     }
   }
 
   void applyDefaultDensityByAssay(String assay) {
     final density = controllerVm.defaultDensityForAssay(assay);
     if (density != null) {
-      seedingDensityController.text = density.toStringAsFixed(0);
+      final displayValue =
+          selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
+              ? density
+              : density * selectedWellBasisArea;
+
+      seedingInputController.text =
+          selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
+              ? displayValue.toStringAsFixed(0)
+              : displayValue.toStringAsFixed(0);
     }
   }
 
@@ -539,6 +591,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   @override
   void initState() {
     super.initState();
+    selectedWellBasisWare = selectedWare;
     applyDefaultDensityByAssay(selectedAssay);
     applyDefaultSeedingVolumeByWare(selectedWare);
     editablePlateLayout = buildGeneratedLayout();
@@ -547,7 +600,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
 
   @override
   void dispose() {
-    seedingDensityController.dispose();
+    seedingInputController.dispose();
     sampleCountController.dispose();
     replicateController.dispose();
     targetConfluencyController.dispose();
@@ -665,26 +718,136 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   }).toList(),
                   onChanged: (value) {
                     if (value == null) return;
-                    selectedWare = value;
-                    applyDefaultSeedingVolumeByWare(value);
-                    autoGenerateLayout = true;
-                    editablePlateLayout = buildGeneratedLayout();
-                    setState(() {});
+
+                    setState(() {
+                      selectedWare = value;
+                      applyDefaultSeedingVolumeByWare(value);
+                      autoGenerateLayout = true;
+                      editablePlateLayout = buildGeneratedLayout();
+                    });
                   },
                 ),
                 const SizedBox(height: 20),
                 buildSectionTitle('Seeding Conditions'),
                 const SizedBox(height: 8),
+
+                DropdownButtonFormField<SeedingInputMode>(
+                  value: selectedSeedingInputMode,
+                  decoration: const InputDecoration(
+                    labelText: 'Seeding input mode',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: SeedingInputMode.cellsPerCm2,
+                      child: Text('cells/cm²'),
+                    ),
+                    DropdownMenuItem(
+                      value: SeedingInputMode.cellsPerWell,
+                      child: Text('cells/well'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+
+                    final currentRaw =
+                        double.tryParse(seedingInputController.text.trim());
+
+                    setState(() {
+                      if (currentRaw != null && currentRaw > 0) {
+                        if (selectedSeedingInputMode ==
+                                SeedingInputMode.cellsPerCm2 &&
+                            value == SeedingInputMode.cellsPerWell) {
+                          seedingInputController.text =
+                              (currentRaw * selectedWellBasisArea)
+                                  .toStringAsFixed(0);
+                        } else if (selectedSeedingInputMode ==
+                                SeedingInputMode.cellsPerWell &&
+                            value == SeedingInputMode.cellsPerCm2) {
+                          seedingInputController.text =
+                              (currentRaw / selectedWellBasisArea)
+                                  .toStringAsFixed(2);
+                        }
+                      }
+
+                      selectedSeedingInputMode = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                DropdownButtonFormField<String>(
+                  value: selectedWellBasisWare,
+                  decoration: const InputDecoration(
+                    labelText: 'Well basis plate',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: controllerVm.cultureWareAreaMap.keys.map((ware) {
+                    return DropdownMenuItem(
+                      value: ware,
+                      child: Text(ware),
+                    );
+                  }).toList(),
+                  onChanged:
+                      selectedSeedingInputMode == SeedingInputMode.cellsPerWell
+                          ? (value) {
+                              if (value == null) return;
+
+                              final currentRaw = double.tryParse(
+                                seedingInputController.text.trim(),
+                              );
+
+                              setState(() {
+                                if (currentRaw != null && currentRaw > 0) {
+                                  final density =
+                                      currentRaw / selectedWellBasisArea;
+                                  selectedWellBasisWare = value;
+                                  final newDisplay =
+                                      density * selectedWellBasisArea;
+                                  seedingInputController.text =
+                                      newDisplay.toStringAsFixed(0);
+                                } else {
+                                  selectedWellBasisWare = value;
+                                }
+                              });
+                            }
+                          : null,
+                ),
+                const SizedBox(height: 12),
+
                 buildTextField(
-                  label: 'Seeding density (cells/cm²)',
-                  controller: seedingDensityController,
+                  label: selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
+                      ? 'Seeding density (cells/cm²)'
+                      : 'Seeding amount (cells/well, based on $selectedWellBasisWare)',
+                  controller: seedingInputController,
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: decimalInputFormatters(decimalRange: 2),
-                  validator: (value) =>
-                      validatePositiveNumber(value, 'Seeding density'),
+                  validator: (value) => validatePositiveNumber(
+                    value,
+                    selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
+                        ? 'Seeding density'
+                        : 'Seeding amount',
+                  ),
                   onChanged: (_) => onCalculationInputChanged(),
                 ),
+                const SizedBox(height: 8),
+
+                if (normalizedSeedingDensity != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Normalized: ${normalizedSeedingDensity!.toStringAsFixed(2)} cells/cm²\n'
+                      'Basis plate: ${basisCellsPerWell?.toStringAsFixed(0) ?? '-'} cells/well ($selectedWellBasisWare)\n'
+                      'Actual culture ware: ${actualCellsPerCultureUnit?.toStringAsFixed(0) ?? '-'} cells/well ($selectedWare)',
+                    ),
+                  ),
+
                 const SizedBox(height: 12),
                 buildTextField(
                   label: 'Sample count',
@@ -802,8 +965,18 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   selectedAssay: selectedAssay,
                   onApply: () {
                     if (recommendedDensity == null) return;
-                    seedingDensityController.text =
-                        recommendedDensity!.toStringAsFixed(0);
+
+                    final displayValue =
+                        selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
+                            ? recommendedDensity!
+                            : recommendedDensity! * selectedWellBasisArea;
+
+                    seedingInputController.text =
+                        selectedSeedingInputMode ==
+                                SeedingInputMode.cellsPerCm2
+                            ? displayValue.toStringAsFixed(0)
+                            : displayValue.toStringAsFixed(0);
+
                     setState(() {});
                   },
                 ),
@@ -811,16 +984,24 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                 buildSectionTitle('Calculated Result'),
                 const SizedBox(height: 8),
                 CellCultureResultCard(
-                  form: data,
-                  summary: result,
+                  form: formData,
+                  summary: summary,
                   selectedCellLine: selectedCellLine,
+                  selectedSeedingInputMode: selectedSeedingInputMode,
+                  selectedWellBasisWare: selectedWellBasisWare,
+                  basisCellsPerWell: basisCellsPerWell,
+                  actualCellsPerCultureUnit: actualCellsPerCultureUnit,
                 ),
                 const SizedBox(height: 12),
                 buildSectionTitle('Suspension Preparation'),
                 const SizedBox(height: 8),
                 CellCultureSuspensionCard(
-                  form: data,
-                  summary: result,
+                  form: formData,
+                  summary: summary,
+                  selectedSeedingInputMode: selectedSeedingInputMode,
+                  selectedWellBasisWare: selectedWellBasisWare,
+                  basisCellsPerWell: basisCellsPerWell,
+                  actualCellsPerCultureUnit: actualCellsPerCultureUnit,
                 ),
                 const SizedBox(height: 12),
                 buildSectionTitle('Plate Layout'),
