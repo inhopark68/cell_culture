@@ -1,0 +1,28 @@
+[
+  {
+    "primaryName": "HeLa",
+    "synonyms": ["_HeLa", "HELA", "Hela"],
+    "source": "ATCC",
+    "catalogNumber": "CCL-2",
+    "cvclId": "CVCL_0030",
+    "rrid": "RRID:CVCL_0030",
+    "species": "Human",
+    "tissue": "Cervix",
+    "disease": "Adenocarcinoma",
+    "isMisidentified": false,
+    "misidentifiedNote": null
+  },
+  {
+    "primaryName": "HEK293",
+    "synonyms": ["293", "HEK-293"],
+    "source": "ATCC",
+    "catalogNumber": "CRL-1573",
+    "cvclId": "CVCL_0045",
+    "rrid": "RRID:CVCL_0045",
+    "species": "Human",
+    "tissue": "Kidney",
+    "disease": "Transformed embryonic kidney",
+    "isMisidentified": false,
+    "misidentifiedNote": null
+  }
+]

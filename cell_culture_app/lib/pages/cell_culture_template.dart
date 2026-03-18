@@ -67,7 +67,18 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   String selectedSourceFilter = 'All';
   String selectedSpeciesFilter = 'All';
 
-  final List<String> sourceFilters = ['All', 'ATCC', 'KCLB'];
+  // final List<String> sourceFilters = ['All', 'ATCC', 'KCLB'];
+  final List<String> sourceFilters = [
+    'All',
+    'ATCC',
+    'KCLB',
+    'JCRB',
+    'DSMZ',
+    'ECACC',
+    'RIKEN BRC',
+    'CBCAS',
+    'NCCS',
+  ];
   final List<String> speciesFilters = [
     'All',
     'Human',
@@ -310,7 +321,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       CellLineOption? matched;
 
       for (final item in items) {
-        if (item.name.toLowerCase() == 'hela') {
+        if (CellLineCatalogService.hasAlias(item, 'hela')) {
           matched = item;
           break;
         }
@@ -358,16 +369,10 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   }
 
   Iterable<CellLineOption> filterCellLineOptions(String query) {
-    final q = query.trim().toLowerCase();
+    final normalizedQuery = CellLineCatalogService.normalizeCellLineText(query);
 
     final filtered = cellLineOptions.where((item) {
-      final matchesQuery = q.isEmpty ||
-          item.name.toLowerCase().contains(q) ||
-          item.catalogNumber.toLowerCase().contains(q) ||
-          item.source.toLowerCase().contains(q) ||
-          (item.species?.toLowerCase().contains(q) ?? false) ||
-          (item.tissue?.toLowerCase().contains(q) ?? false) ||
-          (item.disease?.toLowerCase().contains(q) ?? false);
+      final matchesQuery = CellLineCatalogService.matchesQuery(item, query);
 
       final matchesSource = selectedSourceFilter == 'All' ||
           item.source.toUpperCase() == selectedSourceFilter.toUpperCase();
@@ -381,14 +386,29 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     }).toList();
 
     filtered.sort((a, b) {
-      final aStarts =
-          q.isNotEmpty && a.name.toLowerCase().startsWith(q) ? 0 : 1;
-      final bStarts =
-          q.isNotEmpty && b.name.toLowerCase().startsWith(q) ? 0 : 1;
-      if (aStarts != bStarts) return aStarts.compareTo(bStarts);
+      final aStarts = normalizedQuery.isNotEmpty &&
+              (CellLineCatalogService.normalizeCellLineText(a.primaryName)
+                      .startsWith(normalizedQuery) ||
+                  a.synonyms.any(
+                    (s) => CellLineCatalogService.normalizeCellLineText(s)
+                        .startsWith(normalizedQuery),
+                  ))
+          ? 0
+          : 1;
 
+      final bStarts = normalizedQuery.isNotEmpty &&
+              (CellLineCatalogService.normalizeCellLineText(b.primaryName)
+                      .startsWith(normalizedQuery) ||
+                  b.synonyms.any(
+                    (s) => CellLineCatalogService.normalizeCellLineText(s)
+                        .startsWith(normalizedQuery),
+                  ))
+          ? 0
+          : 1;
+
+      if (aStarts != bStarts) return aStarts.compareTo(bStarts);
       if (a.source != b.source) return a.source.compareTo(b.source);
-      return a.name.compareTo(b.name);
+      return a.primaryName.compareTo(b.primaryName);
     });
 
     return filtered.take(20);
