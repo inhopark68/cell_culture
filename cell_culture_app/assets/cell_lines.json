@@ -1,0 +1,25 @@
+[
+  { "name": "_HeLa", "source": "ATCC", "catalogNumber": "CCL-2", "species": "Human", "tissue": "Cervix", "disease": "Adenocarcinoma" },
+  { "name": "HEK293", "source": "ATCC", "catalogNumber": "CRL-1573", "species": "Human", "tissue": "Kidney", "disease": "Transformed embryonic kidney" },
+  { "name": "A549", "source": "ATCC", "catalogNumber": "CCL-185", "species": "Human", "tissue": "Lung", "disease": "Carcinoma" },
+  { "name": "MCF-7", "source": "ATCC", "catalogNumber": "HTB-22", "species": "Human", "tissue": "Breast", "disease": "Adenocarcinoma" },
+
+  { "name": "NIH/3T3", "source": "ATCC", "catalogNumber": "CRL-1658", "species": "Mouse", "tissue": "Embryo", "disease": null },
+  { "name": "L929", "source": "ATCC", "catalogNumber": "CCL-1", "species": "Mouse", "tissue": "Connective tissue", "disease": null },
+
+  { "name": "PC-12", "source": "ATCC", "catalogNumber": "CRL-1721", "species": "Rat", "tissue": "Adrenal gland", "disease": "Pheochromocytoma" },
+  { "name": "H9c2", "source": "ATCC", "catalogNumber": "CRL-1446", "species": "Rat", "tissue": "Heart", "disease": null },
+
+  { "name": "CHO-K1", "source": "ATCC", "catalogNumber": "CCL-61", "species": "Hamster", "tissue": "Ovary", "disease": null },
+  { "name": "BHK-21", "source": "ATCC", "catalogNumber": "CCL-10", "species": "Hamster", "tissue": "Kidney", "disease": null },
+
+  { "name": "Vero", "source": "ATCC", "catalogNumber": "CCL-81", "species": "Monkey", "tissue": "Kidney", "disease": null },
+  { "name": "COS-7", "source": "ATCC", "catalogNumber": "CRL-1651", "species": "Monkey", "tissue": "Kidney", "disease": null },
+  { "name": "CV-1", "source": "ATCC", "catalogNumber": "CCL-70", "species": "Monkey", "tissue": "Kidney", "disease": null },
+
+  { "name": "MDCK", "source": "KCLB", "catalogNumber": "10034", "species": "Dog", "tissue": "Kidney", "disease": null },
+  { "name": "D-17", "source": "ATCC", "catalogNumber": "CRL-6248", "species": "Dog", "tissue": "Bone", "disease": "Osteosarcoma" },
+
+  { "name": "CRFK", "source": "ATCC", "catalogNumber": "CCL-94", "species": "Cat", "tissue": "Kidney", "disease": null },
+  { "name": "Fcwf-4", "source": "ATCC", "catalogNumber": "CRL-2787", "species": "Cat", "tissue": "Macrophage", "disease": null }
+]

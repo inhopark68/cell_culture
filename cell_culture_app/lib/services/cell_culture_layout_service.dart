@@ -1,40 +1,6 @@
 import 'package:flutter/material.dart';
 
 class CellCultureLayoutService {
-  static int getPlateRows(String ware) {
-    switch (ware) {
-      case '6-well plate':
-        return 2;
-      case '12-well plate':
-        return 3;
-      case '24-well plate':
-        return 4;
-      case '48-well plate':
-        return 6;
-      case '96-well plate':
-        return 8;
-      default:
-        return 0;
-    }
-  }
-
-  static int getPlateCols(String ware) {
-    switch (ware) {
-      case '6-well plate':
-        return 3;
-      case '12-well plate':
-        return 4;
-      case '24-well plate':
-        return 6;
-      case '48-well plate':
-        return 8;
-      case '96-well plate':
-        return 12;
-      default:
-        return 0;
-    }
-  }
-
   static List<List<String>> generatePlateLayout({
     required String ware,
     required int sampleCount,
@@ -44,64 +10,186 @@ class CellCultureLayoutService {
     required int positiveControlCount,
     required int negativeControlCount,
   }) {
-    final rows = getPlateRows(ware);
-    final cols = getPlateCols(ware);
+    final size = _plateSize(ware);
+    if (size == null) return [];
 
-    if (rows == 0 || cols == 0) return [];
+    final rows = size.$1;
+    final cols = size.$2;
+    final totalWells = rows * cols;
 
-    final totalSlots = rows * cols;
-    final grid = List.generate(rows, (_) => List.generate(cols, (_) => ''));
+    final sampleLabels = _buildSampleLabels(
+      sampleCount: sampleCount,
+      replicates: replicates,
+    );
 
-    final sampleLabels = <String>[];
-    final controlLabels = <String>[];
+    final controlLabels = _buildControlLabels(
+      blankCount: blankCount,
+      negativeControlCount: negativeControlCount,
+      vehicleCount: vehicleCount,
+      positiveControlCount: positiveControlCount,
+    );
+
+    final optimized = _optimizeWellOrder(
+      samples: sampleLabels,
+      controls: controlLabels,
+      totalWells: totalWells,
+      rows: rows,
+      cols: cols,
+    );
+
+    return _toGrid(
+      labels: optimized,
+      rows: rows,
+      cols: cols,
+    );
+  }
+
+  static (int, int)? _plateSize(String ware) {
+    switch (ware) {
+      case '6-well plate':
+        return (2, 3);
+      case '12-well plate':
+        return (3, 4);
+      case '24-well plate':
+        return (4, 6);
+      case '48-well plate':
+        return (6, 8);
+      case '96-well plate':
+        return (8, 12);
+      default:
+        return null;
+    }
+  }
+
+  static List<String> _buildSampleLabels({
+    required int sampleCount,
+    required int replicates,
+  }) {
+    final labels = <String>[];
 
     for (int s = 1; s <= sampleCount; s++) {
       for (int r = 1; r <= replicates; r++) {
-        sampleLabels.add('S$s-R$r');
+        labels.add('S$s-R$r');
       }
     }
 
-    for (int i = 1; i <= blankCount; i++) {
-      controlLabels.add('BLK$i');
-    }
+    return labels;
+  }
+
+  static List<String> _buildControlLabels({
+    required int blankCount,
+    required int negativeControlCount,
+    required int vehicleCount,
+    required int positiveControlCount,
+  }) {
+    final labels = <String>[];
+
     for (int i = 1; i <= negativeControlCount; i++) {
-      controlLabels.add('NC$i');
+      labels.add('NC$i');
     }
     for (int i = 1; i <= vehicleCount; i++) {
-      controlLabels.add('VEH$i');
+      labels.add('VEH$i');
     }
     for (int i = 1; i <= positiveControlCount; i++) {
-      controlLabels.add('PC$i');
+      labels.add('PC$i');
+    }
+    for (int i = 1; i <= blankCount; i++) {
+      labels.add('BLK$i');
     }
 
-    if (sampleLabels.length + controlLabels.length > totalSlots) {
-      final allLabels = [...sampleLabels, ...controlLabels];
-      for (int i = 0; i < allLabels.length && i < totalSlots; i++) {
-        final row = i ~/ cols;
-        final col = i % cols;
-        grid[row][col] = allLabels[i];
-      }
-      return grid;
+    return labels;
+  }
+
+  static List<String> _optimizeWellOrder({
+    required List<String> samples,
+    required List<String> controls,
+    required int totalWells,
+    required int rows,
+    required int cols,
+  }) {
+    final placed = <String>[];
+
+    placed.addAll(_groupSamplesByReplicateProximity(
+      samples: samples,
+      cols: cols,
+    ));
+
+    placed.addAll(controls);
+
+    if (placed.length > totalWells) {
+      return placed.take(totalWells).toList();
     }
 
-    int controlIndex = 0;
-    for (int c = cols - 1; c >= 0; c--) {
-      for (int r = 0; r < rows; r++) {
-        if (controlIndex >= controlLabels.length) break;
-        grid[r][c] = controlLabels[controlIndex];
-        controlIndex++;
-      }
-      if (controlIndex >= controlLabels.length) break;
+    final remaining = totalWells - placed.length;
+    return [
+      ...placed,
+      ...List.generate(remaining, (_) => ''),
+    ];
+  }
+
+  static List<String> _groupSamplesByReplicateProximity({
+    required List<String> samples,
+    required int cols,
+  }) {
+    if (samples.isEmpty) return [];
+
+    final grouped = <String, List<String>>{};
+
+    for (final label in samples) {
+      final parts = label.split('-');
+      final sampleKey = parts.first;
+      grouped.putIfAbsent(sampleKey, () => []);
+      grouped[sampleKey]!.add(label);
     }
 
-    int sampleIndex = 0;
+    for (final entry in grouped.entries) {
+      entry.value.sort((a, b) {
+        final ra = _extractReplicateNumber(a);
+        final rb = _extractReplicateNumber(b);
+        return ra.compareTo(rb);
+      });
+    }
+
+    final orderedSampleKeys = grouped.keys.toList()
+      ..sort((a, b) => _extractSampleNumber(a).compareTo(_extractSampleNumber(b)));
+
+    final output = <String>[];
+
+    for (final key in orderedSampleKeys) {
+      final replicates = grouped[key]!;
+      output.addAll(replicates);
+    }
+
+    return output;
+  }
+
+  static int _extractSampleNumber(String label) {
+    final match = RegExp(r'S(\d+)').firstMatch(label);
+    if (match == null) return 999999;
+    return int.tryParse(match.group(1) ?? '') ?? 999999;
+  }
+
+  static int _extractReplicateNumber(String label) {
+    final match = RegExp(r'R(\d+)').firstMatch(label);
+    if (match == null) return 999999;
+    return int.tryParse(match.group(1) ?? '') ?? 999999;
+  }
+
+  static List<List<String>> _toGrid({
+    required List<String> labels,
+    required int rows,
+    required int cols,
+  }) {
+    final grid = <List<String>>[];
+    int index = 0;
+
     for (int r = 0; r < rows; r++) {
+      final row = <String>[];
       for (int c = 0; c < cols; c++) {
-        if (grid[r][c].isNotEmpty) continue;
-        if (sampleIndex >= sampleLabels.length) break;
-        grid[r][c] = sampleLabels[sampleIndex];
-        sampleIndex++;
+        row.add(index < labels.length ? labels[index] : '');
+        index++;
       }
+      grid.add(row);
     }
 
     return grid;
@@ -125,7 +213,6 @@ class CellCultureLayoutService {
     if (value.startsWith('NC')) return Colors.red.shade100;
     if (value.startsWith('VEH')) return Colors.yellow.shade100;
     if (value.startsWith('PC')) return Colors.green.shade100;
-    if (value.startsWith('S')) return Colors.blue.shade50;
-    return Colors.white;
+    return Colors.blue.shade50;
   }
 }
