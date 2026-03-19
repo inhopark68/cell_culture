@@ -16,6 +16,16 @@ class CellCultureFormData {
   final double stockConcentration;
   final double extraPercent;
 
+  // 추가: medium 관련 필드
+  final String cultureMedium;
+  final double serumPercent;
+  final bool usePenStrep;
+  final bool useGlutamax;
+  final bool useHepes;
+  final bool useNeaa;
+  final bool useSodiumPyruvate;
+  final String mediumNote;
+
   const CellCultureFormData({
     required this.selectedAssay,
     required this.selectedWare,
@@ -30,6 +40,16 @@ class CellCultureFormData {
     required this.seedingVolumePerUnit,
     required this.stockConcentration,
     required this.extraPercent,
+
+    // 추가
+    this.cultureMedium = '',
+    this.serumPercent = 0,
+    this.usePenStrep = false,
+    this.useGlutamax = false,
+    this.useHepes = false,
+    this.useNeaa = false,
+    this.useSodiumPyruvate = false,
+    this.mediumNote = '',
   });
 
   factory CellCultureFormData.fromRaw({
@@ -46,6 +66,16 @@ class CellCultureFormData {
     required String seedingVolumeText,
     required String stockConcentrationText,
     required String extraPercentText,
+
+    // 추가
+    String cultureMedium = '',
+    String serumPercentText = '',
+    bool usePenStrep = false,
+    bool useGlutamax = false,
+    bool useHepes = false,
+    bool useNeaa = false,
+    bool useSodiumPyruvate = false,
+    String mediumNote = '',
   }) {
     return CellCultureFormData(
       selectedAssay: selectedAssay,
@@ -61,6 +91,16 @@ class CellCultureFormData {
       seedingVolumePerUnit: double.tryParse(seedingVolumeText) ?? 0,
       stockConcentration: double.tryParse(stockConcentrationText) ?? 0,
       extraPercent: (double.tryParse(extraPercentText) ?? 0) / 100.0,
+
+      // 추가
+      cultureMedium: cultureMedium,
+      serumPercent: double.tryParse(serumPercentText) ?? 0,
+      usePenStrep: usePenStrep,
+      useGlutamax: useGlutamax,
+      useHepes: useHepes,
+      useNeaa: useNeaa,
+      useSodiumPyruvate: useSodiumPyruvate,
+      mediumNote: mediumNote,
     );
   }
 
@@ -93,6 +133,11 @@ class CellCultureFormData {
     }
     if (extraPercent < 0) {
       errors.add('Extra(%)는 0 이상이어야 합니다.');
+    }
+
+    // 선택: medium validation
+    if (serumPercent < 0) {
+      errors.add('Serum percent는 0 이상이어야 합니다.');
     }
 
     return errors;

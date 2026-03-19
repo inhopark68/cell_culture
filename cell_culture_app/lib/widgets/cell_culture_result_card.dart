@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../models/cell_culture_form_data.dart';
 import '../models/cell_culture_summary.dart';
@@ -28,17 +29,12 @@ class CellCultureResultCard extends StatelessWidget {
 
   String _f0(num? value) {
     if (value == null) return '-';
-    return value.toStringAsFixed(0);
-  }
-
-  String _f1(num? value) {
-    if (value == null) return '-';
-    return value.toStringAsFixed(1);
+    return NumberFormat('#,###').format(value);
   }
 
   String _f2(num? value) {
     if (value == null) return '-';
-    return value.toStringAsFixed(2);
+    return NumberFormat('#,##0.00').format(value);
   }
 
   Widget _row(String label, String value) {
@@ -67,9 +63,18 @@ class CellCultureResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalizedDensity = form.seedingDensity;
-    final inputModeLabel = selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
-        ? 'cells/cm²'
-        : 'cells/well';
+    final inputModeLabel =
+        selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
+            ? 'cells/cm²'
+            : 'cells/well';
+
+    final supplements = [
+      if (form.usePenStrep) 'Pen/Strep',
+      if (form.useGlutamax) 'GlutaMAX',
+      if (form.useHepes) 'HEPES',
+      if (form.useNeaa) 'NEAA',
+      if (form.useSodiumPyruvate) 'Sodium pyruvate',
+    ].join(', ');
 
     return Card(
       child: Padding(
@@ -79,11 +84,19 @@ class CellCultureResultCard extends StatelessWidget {
             _row('Cell line', selectedCellLine?.displayLabel ?? '-'),
             _row('Assay', form.selectedAssay),
             _row('Culture ware', form.selectedWare),
+            _row('Culture medium', form.cultureMedium),
+            _row('Serum', '${_f2(form.serumPercent)} %'),
+            _row('Supplements', supplements.isEmpty ? '-' : supplements),
+            if (form.mediumNote.trim().isNotEmpty)
+              _row('Medium note', form.mediumNote),
 
             const Divider(height: 24),
 
             _row('Input mode', inputModeLabel),
-            _row('Normalized seeding density', '${_f2(normalizedDensity)} cells/cm²'),
+            _row(
+              'Normalized seeding density',
+              '${_f2(normalizedDensity)} cells/cm²',
+            ),
             _row(
               'Input basis',
               '${_f0(basisCellsPerWell)} cells/well ($selectedWellBasisWare)',
@@ -106,7 +119,10 @@ class CellCultureResultCard extends StatelessWidget {
               'Total cells needed (+extra)',
               _f0(summary.totalCellsNeededWithExtra),
             ),
-            _row('Total seeding volume', '${_f2(summary.totalSeedingVolume)} mL'),
+            _row(
+              'Total seeding volume',
+              '${_f2(summary.totalSeedingVolume)} mL',
+            ),
             _row(
               'Total seeding volume (+extra)',
               '${_f2(summary.totalSeedingVolumeWithExtra)} mL',

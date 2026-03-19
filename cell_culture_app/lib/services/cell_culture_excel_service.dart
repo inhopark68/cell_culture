@@ -137,6 +137,24 @@ class CellCultureExcelService {
     return _plateSampleStyle;
   }
 
+  static String _buildSupplementsText({
+    required bool usePenStrep,
+    required bool useGlutamax,
+    required bool useHepes,
+    required bool useNeaa,
+    required bool useSodiumPyruvate,
+  }) {
+    final items = <String>[
+      if (usePenStrep) 'Pen/Strep',
+      if (useGlutamax) 'GlutaMAX',
+      if (useHepes) 'HEPES',
+      if (useNeaa) 'NEAA',
+      if (useSodiumPyruvate) 'Sodium pyruvate',
+    ];
+
+    return items.isEmpty ? '-' : items.join(', ');
+  }
+
   static Future<String?> export({
     required String cellLine,
     required String assayType,
@@ -166,6 +184,14 @@ class CellCultureExcelService {
     required double requiredMediaVolume,
     required double requiredMediaVolumeWithExtra,
     required double extraPercent,
+    required String cultureMedium,
+    required double serumPercent,
+    required bool usePenStrep,
+    required bool useGlutamax,
+    required bool useHepes,
+    required bool useNeaa,
+    required bool useSodiumPyruvate,
+    required String mediumNote,
     required List<List<String>> layout,
   }) async {
     try {
@@ -183,6 +209,14 @@ class CellCultureExcelService {
           defaultSheet != 'Plate Layout') {
         excel.delete(defaultSheet);
       }
+
+      final supplementsText = _buildSupplementsText(
+        usePenStrep: usePenStrep,
+        useGlutamax: useGlutamax,
+        useHepes: useHepes,
+        useNeaa: useNeaa,
+        useSodiumPyruvate: useSodiumPyruvate,
+      );
 
       // Summary sheet
       _setCell(summarySheet, 'A1', 'Cell Culture Summary', style: _titleStyle);
@@ -240,7 +274,7 @@ class CellCultureExcelService {
         value: targetConfluency,
       );
 
-      _setCell(summarySheet, 'A12', 'Experimental Design', style: _sectionStyle);
+      _setCell(summarySheet, 'A12', 'Culture Medium', style: _sectionStyle);
       summarySheet.merge(
         CellIndex.indexByString('A12'),
         CellIndex.indexByString('B12'),
@@ -249,85 +283,116 @@ class CellCultureExcelService {
       _setLabelValueRow(
         summarySheet,
         rowNumber: 13,
+        label: 'Basal medium',
+        value: cultureMedium,
+      );
+      _setLabelValueRow(
+        summarySheet,
+        rowNumber: 14,
+        label: 'Serum (%)',
+        value: serumPercent,
+      );
+      _setLabelValueRow(
+        summarySheet,
+        rowNumber: 15,
+        label: 'Supplements',
+        value: supplementsText,
+      );
+      _setLabelValueRow(
+        summarySheet,
+        rowNumber: 16,
+        label: 'Medium note',
+        value: mediumNote.trim().isEmpty ? '-' : mediumNote.trim(),
+      );
+
+      _setCell(summarySheet, 'A18', 'Experimental Design', style: _sectionStyle);
+      summarySheet.merge(
+        CellIndex.indexByString('A18'),
+        CellIndex.indexByString('B18'),
+      );
+
+      _setLabelValueRow(
+        summarySheet,
+        rowNumber: 19,
         label: 'Sample count',
         value: sampleCount,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 14,
+        rowNumber: 20,
         label: 'Replicates',
         value: replicateCount,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 15,
+        rowNumber: 21,
         label: 'Blank count',
         value: blankCount,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 16,
+        rowNumber: 22,
         label: 'Negative control count',
         value: negativeControlCount,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 17,
+        rowNumber: 23,
         label: 'Vehicle count',
         value: vehicleCount,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 18,
+        rowNumber: 24,
         label: 'Positive control count',
         value: positiveControlCount,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 19,
+        rowNumber: 25,
         label: 'Total control units',
         value: totalControlUnits,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 20,
+        rowNumber: 26,
         label: 'Total sample units',
         value: totalSampleUnits,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 21,
+        rowNumber: 27,
         label: 'Total culture units',
         value: totalCultureUnits,
       );
 
-      _setCell(summarySheet, 'A23', 'Calculated Result', style: _sectionStyle);
+      _setCell(summarySheet, 'A29', 'Calculated Result', style: _sectionStyle);
       summarySheet.merge(
-        CellIndex.indexByString('A23'),
-        CellIndex.indexByString('B23'),
+        CellIndex.indexByString('A29'),
+        CellIndex.indexByString('B29'),
       );
 
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 24,
+        rowNumber: 30,
         label: 'Cells per unit',
         value: cellsPerUnit,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 25,
+        rowNumber: 31,
         label: 'Total cells needed',
         value: totalCellsNeeded,
       );
       _setLabelValueRow(
         summarySheet,
-        rowNumber: 26,
+        rowNumber: 32,
         label: 'Total cells needed (+extra)',
         value: totalCellsNeededWithExtra,
       );
 
       summarySheet.setColumnWidth(0, 28);
-      summarySheet.setColumnWidth(1, 24);
+      summarySheet.setColumnWidth(1, 28);
 
       // Suspension sheet
       _setCell(
@@ -344,66 +409,90 @@ class CellCultureExcelService {
       _setLabelValueRow(
         suspensionSheet,
         rowNumber: 3,
+        label: 'Culture medium',
+        value: cultureMedium,
+      );
+      _setLabelValueRow(
+        suspensionSheet,
+        rowNumber: 4,
+        label: 'Serum (%)',
+        value: serumPercent,
+      );
+      _setLabelValueRow(
+        suspensionSheet,
+        rowNumber: 5,
+        label: 'Supplements',
+        value: supplementsText,
+      );
+      _setLabelValueRow(
+        suspensionSheet,
+        rowNumber: 6,
         label: 'Seeding volume per unit (mL)',
         value: seedingVolumePerUnit,
       );
       _setLabelValueRow(
         suspensionSheet,
-        rowNumber: 4,
+        rowNumber: 7,
         label: 'Total seeding volume (mL)',
         value: totalSeedingVolume,
       );
       _setLabelValueRow(
         suspensionSheet,
-        rowNumber: 5,
+        rowNumber: 8,
         label: 'Total seeding volume (+extra) (mL)',
         value: totalSeedingVolumeWithExtra,
       );
       _setLabelValueRow(
         suspensionSheet,
-        rowNumber: 6,
+        rowNumber: 9,
         label: 'Stock concentration (cells/mL)',
         value: stockConcentration,
       );
       _setLabelValueRow(
         suspensionSheet,
-        rowNumber: 7,
+        rowNumber: 10,
         label: 'Required cell suspension (mL)',
         value: requiredCellSuspensionVolume,
       );
       _setLabelValueRow(
         suspensionSheet,
-        rowNumber: 8,
+        rowNumber: 11,
         label: 'Required cell suspension (+extra) (mL)',
         value: requiredCellSuspensionVolumeWithExtra,
       );
       _setLabelValueRow(
         suspensionSheet,
-        rowNumber: 9,
+        rowNumber: 12,
         label: 'Required media volume (mL)',
         value: requiredMediaVolume,
       );
       _setLabelValueRow(
         suspensionSheet,
-        rowNumber: 10,
+        rowNumber: 13,
         label: 'Required media volume (+extra) (mL)',
         value: requiredMediaVolumeWithExtra,
       );
       _setLabelValueRow(
         suspensionSheet,
-        rowNumber: 11,
+        rowNumber: 14,
         label: 'Extra fraction',
         value: extraPercent,
       );
       _setLabelValueRow(
         suspensionSheet,
-        rowNumber: 12,
+        rowNumber: 15,
         label: 'Extra percent (%)',
         value: extraPercent * 100,
       );
+      _setLabelValueRow(
+        suspensionSheet,
+        rowNumber: 16,
+        label: 'Medium note',
+        value: mediumNote.trim().isEmpty ? '-' : mediumNote.trim(),
+      );
 
-      suspensionSheet.setColumnWidth(0, 32);
-      suspensionSheet.setColumnWidth(1, 22);
+      suspensionSheet.setColumnWidth(0, 34);
+      suspensionSheet.setColumnWidth(1, 24);
 
       // Plate Layout sheet
       _setCell(layoutSheet, 'A1', 'Plate Layout', style: _titleStyle);

@@ -5,7 +5,6 @@ import '../models/cell_line_option.dart';
 class CellCultureCellLineAutocomplete extends StatelessWidget {
   final bool isLoading;
   final String selectedLabel;
-  final TextEditingController controller;
   final Iterable<CellLineOption> Function(String query) optionsBuilder;
   final ValueChanged<CellLineOption> onSelected;
   final ValueChanged<String> onChanged;
@@ -14,7 +13,6 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
     super.key,
     required this.isLoading,
     required this.selectedLabel,
-    required this.controller,
     required this.optionsBuilder,
     required this.onSelected,
     required this.onChanged,
@@ -67,10 +65,6 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
         FocusNode focusNode,
         VoidCallback onFieldSubmitted,
       ) {
-        if (controller.text != textEditingController.text) {
-          textEditingController.value = controller.value;
-        }
-
         return TextField(
           controller: textEditingController,
           focusNode: focusNode,
@@ -80,10 +74,7 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
             border: OutlineInputBorder(),
             prefixIcon: Icon(Icons.search),
           ),
-          onChanged: (value) {
-            controller.value = textEditingController.value;
-            onChanged(value);
-          },
+          onChanged: onChanged,
         );
       },
       optionsViewBuilder: (

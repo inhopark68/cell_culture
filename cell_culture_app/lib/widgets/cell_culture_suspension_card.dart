@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../models/cell_culture_form_data.dart';
 import '../models/cell_culture_summary.dart';
+import '../models/cell_line_option.dart';
 import '../models/seeding_input_mode.dart';
 
 class CellCultureSuspensionCard extends StatelessWidget {
   final CellCultureFormData form;
   final CellCultureSummary summary;
+  final CellLineOption? selectedCellLine;
 
   final SeedingInputMode selectedSeedingInputMode;
   final String selectedWellBasisWare;
@@ -17,6 +20,7 @@ class CellCultureSuspensionCard extends StatelessWidget {
     super.key,
     required this.form,
     required this.summary,
+    required this.selectedCellLine,
     required this.selectedSeedingInputMode,
     required this.selectedWellBasisWare,
     required this.basisCellsPerWell,
@@ -25,12 +29,12 @@ class CellCultureSuspensionCard extends StatelessWidget {
 
   String _f0(num? value) {
     if (value == null) return '-';
-    return value.toStringAsFixed(0);
+    return NumberFormat('#,###').format(value);
   }
 
   String _f2(num? value) {
     if (value == null) return '-';
-    return value.toStringAsFixed(2);
+    return NumberFormat('#,##0.00').format(value);
   }
 
   Widget _row(String label, String value) {
@@ -58,17 +62,41 @@ class CellCultureSuspensionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final normalizedDensity = form.seedingDensity;
     final inputModeLabel =
         selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
             ? 'cells/cm²'
             : 'cells/well';
+
+    final supplements = [
+      if (form.usePenStrep) 'Pen/Strep',
+      if (form.useGlutamax) 'GlutaMAX',
+      if (form.useHepes) 'HEPES',
+      if (form.useNeaa) 'NEAA',
+      if (form.useSodiumPyruvate) 'Sodium pyruvate',
+    ].join(', ');
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            _row('Cell line', selectedCellLine?.displayLabel ?? '-'),
+            _row('Assay', form.selectedAssay),
+            _row('Culture ware', form.selectedWare),
+            _row('Culture medium', form.cultureMedium),
+            _row('Serum', '${_f2(form.serumPercent)} %'),
+            _row('Supplements', supplements.isEmpty ? '-' : supplements),
+            if (form.mediumNote.trim().isNotEmpty)
+              _row('Medium note', form.mediumNote),
+
+            const Divider(height: 24),
+
             _row('Input mode', inputModeLabel),
+            _row(
+              'Normalized seeding density',
+              '${_f2(normalizedDensity)} cells/cm²',
+            ),
             _row(
               'Input basis',
               '${_f0(basisCellsPerWell)} cells/well ($selectedWellBasisWare)',
@@ -80,9 +108,16 @@ class CellCultureSuspensionCard extends StatelessWidget {
 
             const Divider(height: 24),
 
+            _row('Surface area', '${_f2(summary.surfaceArea)} cm²'),
+            _row('Working volume', '${summary.workingVolume} mL'),
+            _row('Sample units', _f0(summary.totalSampleUnits)),
+            _row('Control units', _f0(summary.totalControlUnits)),
+            _row('Total culture units', _f0(summary.totalCultureUnits)),
+            _row('Cells per unit', _f0(summary.cellsPerUnit)),
+            _row('Total cells needed', _f0(summary.totalCellsNeeded)),
             _row(
-              'Seeding volume per unit',
-              '${_f2(form.seedingVolumePerUnit)} mL',
+              'Total cells needed (+extra)',
+              _f0(summary.totalCellsNeededWithExtra),
             ),
             _row(
               'Total seeding volume',
@@ -91,29 +126,6 @@ class CellCultureSuspensionCard extends StatelessWidget {
             _row(
               'Total seeding volume (+extra)',
               '${_f2(summary.totalSeedingVolumeWithExtra)} mL',
-            ),
-
-            const Divider(height: 24),
-
-            _row(
-              'Stock concentration',
-              '${_f0(form.stockConcentration)} cells/mL',
-            ),
-            _row(
-              'Required cell suspension',
-              '${_f2(summary.requiredCellSuspensionVolume)} mL',
-            ),
-            _row(
-              'Required cell suspension (+extra)',
-              '${_f2(summary.requiredCellSuspensionVolumeWithExtra)} mL',
-            ),
-            _row(
-              'Required media volume',
-              '${_f2(summary.requiredMediaVolume)} mL',
-            ),
-            _row(
-              'Required media volume (+extra)',
-              '${_f2(summary.requiredMediaVolumeWithExtra)} mL',
             ),
           ],
         ),

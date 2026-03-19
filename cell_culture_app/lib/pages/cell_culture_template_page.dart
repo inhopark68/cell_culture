@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -14,8 +17,12 @@ import '../models/seeding_input_mode.dart';
 import '../services/cell_culture_excel_service.dart';
 import '../services/cell_culture_layout_service.dart';
 import '../services/cell_line_catalog_service.dart';
+import '../utils/input_formatters.dart';
+import '../utils/number_formatters.dart';
+import '../utils/validators.dart';
 import '../viewmodels/cell_culture_template_controller.dart';
 import '../widgets/cell_culture_cell_line_autocomplete.dart';
+import '../widgets/cell_culture_custom_cell_manager_page.dart';
 import '../widgets/cell_culture_filter_section.dart';
 import '../widgets/cell_culture_plate_layout_section.dart';
 import '../widgets/cell_culture_recommended_density_card.dart';
@@ -38,7 +45,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   final _formKey = GlobalKey<FormState>();
   final controllerVm = CellCultureTemplateController();
 
-  final TextEditingController cellLineTextController = TextEditingController();
   final TextEditingController seedingInputController =
       TextEditingController(text: '50000');
   final TextEditingController sampleCountController =
@@ -62,6 +68,17 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       TextEditingController(text: '0');
   final TextEditingController negativeControlCountController =
       TextEditingController(text: '0');
+
+  // Medium-related fields
+  String selectedCultureMedium = 'DMEM';
+  final TextEditingController serumPercentController =
+      TextEditingController(text: '10');
+  bool usePenStrep = true;
+  bool useGlutamax = false;
+  bool useHepes = false;
+  bool useNeaa = false;
+  bool useSodiumPyruvate = false;
+  final TextEditingController mediumNoteController = TextEditingController();
 
   String selectedAssay = 'qPCR';
   String selectedWare = '24-well plate';
@@ -96,6 +113,18 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     'Cat',
   ];
 
+  final List<String> cultureMediumOptions = [
+    'DMEM',
+    'RPMI-1640',
+    'DMEM/F12',
+    'MEM',
+    'IMDM',
+    'F-12K',
+    'L-15',
+    'McCoy\'s 5A',
+    'Other',
+  ];
+
   List<List<String>> editablePlateLayout = [];
   bool autoGenerateLayout = true;
 
@@ -110,7 +139,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       controllerVm.cultureWareAreaMap[selectedWellBasisWare] ?? 1.0;
 
   double? get normalizedSeedingDensity {
-    final raw = double.tryParse(seedingInputController.text.trim());
+    final raw = parseFormattedDouble(seedingInputController.text);
     if (raw == null || raw <= 0) return null;
 
     switch (selectedSeedingInputMode) {
@@ -141,28 +170,53 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   bool get canUseCustomPicker =>
       selectedSourceFilter == 'All' || selectedSourceFilter == 'Custom';
 
+  List<TextInputFormatter> integerInputFormatters() {
+    return [
+      FilteringTextInputFormatter.digitsOnly,
+      ThousandsSeparatorInputFormatter(),
+    ];
+  }
+
+  List<TextInputFormatter> decimalInputFormatters({int decimalRange = 2}) {
+    return [
+      DecimalThousandsSeparatorInputFormatter(decimalRange: decimalRange),
+    ];
+  }
+
   void selectCellLine(CellLineOption option) {
-    selectedCellLine = option;
-    cellLineTextController.text = option.displayLabel;
-    applyRecommendedDensity(cellLine: option, force: true);
-    autoGenerateLayout = true;
-    editablePlateLayout = buildGeneratedLayout();
+    setState(() {
+      selectedCellLine = option;
+      applyRecommendedDensity(cellLine: option, force: true);
+      autoGenerateLayout = true;
+      editablePlateLayout = buildGeneratedLayout();
+    });
   }
 
   CellCultureFormData get formData => CellCultureFormData.fromRaw(
         selectedAssay: selectedAssay,
         selectedWare: selectedWare,
         seedingDensityText: (normalizedSeedingDensity ?? 0).toString(),
-        sampleCountText: sampleCountController.text,
-        replicateText: replicateController.text,
-        targetConfluencyText: targetConfluencyController.text,
-        blankCountText: blankCountController.text,
-        vehicleCountText: vehicleCountController.text,
-        positiveControlCountText: positiveControlCountController.text,
-        negativeControlCountText: negativeControlCountController.text,
-        seedingVolumeText: seedingVolumeController.text,
-        stockConcentrationText: stockConcentrationController.text,
-        extraPercentText: extraPercentController.text,
+        sampleCountText: sampleCountController.text.replaceAll(',', ''),
+        replicateText: replicateController.text.replaceAll(',', ''),
+        targetConfluencyText: targetConfluencyController.text.replaceAll(',', ''),
+        blankCountText: blankCountController.text.replaceAll(',', ''),
+        vehicleCountText: vehicleCountController.text.replaceAll(',', ''),
+        positiveControlCountText:
+            positiveControlCountController.text.replaceAll(',', ''),
+        negativeControlCountText:
+            negativeControlCountController.text.replaceAll(',', ''),
+        seedingVolumeText: seedingVolumeController.text.replaceAll(',', ''),
+        stockConcentrationText:
+            stockConcentrationController.text.replaceAll(',', ''),
+        extraPercentText: extraPercentController.text.replaceAll(',', ''),
+        cultureMedium: selectedCultureMedium,
+        serumPercentText: serumPercentController.text.replaceAll(',', ''),
+        usePenStrep: usePenStrep,
+        useGlutamax: useGlutamax,
+        useHepes: useHepes,
+        useNeaa: useNeaa,
+        useSodiumPyruvate: useSodiumPyruvate,
+        mediumNote: mediumNoteController.text.trim(),
       );
 
   CellCultureSummary get summary => controllerVm.buildSummary(formData);
@@ -171,86 +225,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
         assay: selectedAssay,
         cellLine: selectedCellLine,
       );
-
-  List<TextInputFormatter> integerInputFormatters() {
-    return [
-      FilteringTextInputFormatter.digitsOnly,
-    ];
-  }
-
-  List<TextInputFormatter> decimalInputFormatters({int decimalRange = 2}) {
-    return [
-      FilteringTextInputFormatter.allow(
-        RegExp(r'^\d*\.?\d{0,' + decimalRange.toString() + r'}'),
-      ),
-    ];
-  }
-
-  String? validateRequiredNumber(String? value, String fieldName) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName 값을 입력하세요.';
-    }
-
-    final n = double.tryParse(value.trim());
-    if (n == null) {
-      return '$fieldName 숫자 형식이 올바르지 않습니다.';
-    }
-
-    return null;
-  }
-
-  String? validatePositiveNumber(String? value, String fieldName) {
-    final basic = validateRequiredNumber(value, fieldName);
-    if (basic != null) return basic;
-
-    final n = double.tryParse(value!.trim())!;
-    if (n <= 0) {
-      return '$fieldName 0보다 커야 합니다.';
-    }
-
-    return null;
-  }
-
-  String? validateNonNegativeInteger(String? value, String fieldName) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName 값을 입력하세요.';
-    }
-
-    final n = int.tryParse(value.trim());
-    if (n == null) {
-      return '$fieldName 정수를 입력하세요.';
-    }
-
-    if (n < 0) {
-      return '$fieldName 0 이상이어야 합니다.';
-    }
-
-    return null;
-  }
-
-  String? validatePositiveInteger(String? value, String fieldName) {
-    final basic = validateNonNegativeInteger(value, fieldName);
-    if (basic != null) return basic;
-
-    final n = int.parse(value!.trim());
-    if (n <= 0) {
-      return '$fieldName 1 이상이어야 합니다.';
-    }
-
-    return null;
-  }
-
-  String? validatePercent0to100(String? value, String fieldName) {
-    final basic = validateRequiredNumber(value, fieldName);
-    if (basic != null) return basic;
-
-    final n = double.parse(value!.trim());
-    if (n < 0 || n > 100) {
-      return '$fieldName 0~100 범위여야 합니다.';
-    }
-
-    return null;
-  }
 
   void applyRecommendedDensity({
     CellLineOption? cellLine,
@@ -263,7 +237,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
 
     if (recommended == null) return;
 
-    final current = double.tryParse(seedingInputController.text);
+    final current = parseFormattedDouble(seedingInputController.text);
     if (force || current == null || current <= 0) {
       final displayValue =
           selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
@@ -362,26 +336,12 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   Future<void> _saveCustomCellLines() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final encoded = customCellLines.map((e) => jsonEncode(e.toJson())).toList();
+      final encoded =
+          customCellLines.map((e) => jsonEncode(e.toJson())).toList();
       await prefs.setStringList(_customCellLinesPrefsKey, encoded);
     } catch (e) {
       debugPrint('Failed to save custom cell lines: $e');
     }
-  }
-
-  Future<void> _clearAllCustomCellLines() async {
-    setState(() {
-      cellLineOptions = cellLineOptions
-          .where((e) => e.source.toUpperCase() != 'CUSTOM')
-          .toList();
-
-      if (selectedCellLine?.source.toUpperCase() == 'CUSTOM') {
-        selectedCellLine = null;
-        cellLineTextController.clear();
-      }
-    });
-
-    await _saveCustomCellLines();
   }
 
   Future<void> _loadCellLines() async {
@@ -405,7 +365,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       setState(() {
         cellLineOptions = items;
         selectedCellLine = matched;
-        cellLineTextController.text = matched?.displayLabel ?? '';
         if (matched != null) {
           autoGenerateLayout = true;
           editablePlateLayout = buildGeneratedLayout();
@@ -421,7 +380,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       setState(() {
         isLoadingCellLines = false;
         selectedCellLine = null;
-        cellLineTextController.clear();
       });
     }
   }
@@ -440,7 +398,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
 
     if (!sourceOk || !speciesOk) {
       selectedCellLine = null;
-      cellLineTextController.clear();
     }
   }
 
@@ -532,88 +489,41 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       text: editablePlateLayout[row][col],
     );
 
-    await showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Edit Well ${String.fromCharCode(65 + row)}${col + 1}'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Label',
-              border: OutlineInputBorder(),
+    try {
+      await showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text('Edit Well ${String.fromCharCode(65 + row)}${col + 1}'),
+            content: TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Label',
+                border: OutlineInputBorder(),
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  editablePlateLayout[row][col] = controller.text.trim();
-                  autoGenerateLayout = false;
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('저장'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  CellLineOption? _findExistingCustomCellLineByName(String input) {
-    final normalizedInput =
-        CellLineCatalogService.normalizeCellLineText(input.trim());
-
-    for (final item in customCellLines) {
-      final normalizedName =
-          CellLineCatalogService.normalizeCellLineText(item.primaryName);
-      if (normalizedName == normalizedInput) {
-        return item;
-      }
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    editablePlateLayout[row][col] = controller.text.trim();
+                    autoGenerateLayout = false;
+                  });
+                  Navigator.pop(context);
+                },
+                child: const Text('저장'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
     }
-    return null;
-  }
-
-  CellLineOption _buildCustomCellLineOption({
-    required String primaryName,
-    required String source,
-    required String catalogNumber,
-    required List<String> synonyms,
-    String? species,
-    String? tissue,
-    String? disease,
-    String? cvclId,
-    String? rrid,
-    bool isMisidentified = false,
-    String? misidentifiedNote,
-  }) {
-    return CellLineOption(
-      primaryName: primaryName.trim(),
-      synonyms: synonyms
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList(),
-      source: source.trim().isEmpty ? 'CUSTOM' : source.trim().toUpperCase(),
-      catalogNumber: catalogNumber.trim().isEmpty
-          ? 'CUSTOM-${primaryName.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]+'), '-')}'
-          : catalogNumber.trim(),
-      cvclId: (cvclId?.trim().isEmpty ?? true) ? null : cvclId!.trim(),
-      rrid: (rrid?.trim().isEmpty ?? true) ? null : rrid!.trim(),
-      species: (species?.trim().isEmpty ?? true) ? null : species!.trim(),
-      tissue: (tissue?.trim().isEmpty ?? true) ? null : tissue!.trim(),
-      disease: (disease?.trim().isEmpty ?? true) ? null : disease!.trim(),
-      isMisidentified: isMisidentified,
-      misidentifiedNote: isMisidentified
-          ? ((misidentifiedNote?.trim().isEmpty ?? true)
-              ? null
-              : misidentifiedNote!.trim())
-          : null,
-    );
   }
 
   String _customCellIdentity(CellLineOption item) {
@@ -624,593 +534,127 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     ].join('|');
   }
 
-  void _upsertCustomCellLine(CellLineOption newItem, {CellLineOption? oldItem}) {
-    final newId = _customCellIdentity(newItem);
-    final oldId = oldItem == null ? null : _customCellIdentity(oldItem);
+  Future<void> exportCustomCellLinesToJson() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/custom_cell_lines_backup.json');
 
-    final updated = <CellLineOption>[];
-    bool replaced = false;
+      final data = customCellLines.map((e) => e.toJson()).toList();
+      final jsonString = const JsonEncoder.withIndent('  ').convert(data);
 
-    for (final item in cellLineOptions) {
-      final id = _customCellIdentity(item);
+      await file.writeAsString(jsonString);
 
-      if (oldId != null && id == oldId) {
-        updated.add(newItem);
-        replaced = true;
-        continue;
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('백업 저장됨: ${file.path}'),
+          action: SnackBarAction(
+            label: '열기',
+            onPressed: () => OpenFilex.open(file.path),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Export error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('JSON 백업 실패: $e')),
+      );
+    }
+  }
+
+  Future<void> importCustomCellLinesFromJson() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (result == null || result.files.single.path == null) return;
+
+      final file = File(result.files.single.path!);
+      final content = await file.readAsString();
+
+      final decoded = jsonDecode(content) as List;
+
+      final imported = decoded
+          .map((e) => CellLineOption.fromJson(e as Map<String, dynamic>))
+          .where((e) => e.source.toUpperCase() == 'CUSTOM')
+          .toList();
+
+      final existingIds = cellLineOptions.map(_customCellIdentity).toSet();
+      final merged = [...cellLineOptions];
+
+      for (final item in imported) {
+        if (!existingIds.contains(_customCellIdentity(item))) {
+          merged.add(item);
+        }
       }
 
-      if (oldId == null &&
-          item.source.toUpperCase() == 'CUSTOM' &&
-          id == newId) {
-        updated.add(newItem);
-        replaced = true;
-        continue;
+      setState(() {
+        cellLineOptions = merged;
+      });
+
+      await _saveCustomCellLines();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Custom cell line 가져오기 완료')),
+      );
+    } catch (e) {
+      debugPrint('Import error: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('JSON 불러오기 실패: $e')),
+      );
+    }
+  }
+
+  Future<void> _openCustomCellLineManager() async {
+    final result = await Navigator.of(context).push<CustomCellManagerResult>(
+      MaterialPageRoute(
+        builder: (_) => CustomCellLineManagerPage(
+          initialItems: customCellLines,
+          selectedItem: selectedCellLine?.source.toUpperCase() == 'CUSTOM'
+              ? selectedCellLine
+              : null,
+          selectedSpeciesFilter: selectedSpeciesFilter,
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+
+    if (!mounted || result == null) return;
+
+    setState(() {
+      cellLineOptions = [
+        ...cellLineOptions.where((e) => e.source.toUpperCase() != 'CUSTOM'),
+        ...result.items,
+      ];
+
+      if (result.selectedItem == null &&
+          selectedCellLine?.source.toUpperCase() == 'CUSTOM') {
+        final stillExists = result.items.any(
+          (e) =>
+              _customCellIdentity(e) == _customCellIdentity(selectedCellLine!),
+        );
+        if (!stillExists) {
+          selectedCellLine = null;
+        }
       }
 
-      updated.add(item);
+      if (result.selectedItem != null) {
+        selectedSourceFilter = 'Custom';
+      }
+    });
+
+    if (result.selectedItem != null) {
+      selectCellLine(result.selectedItem!);
     }
 
-    if (!replaced) {
-      updated.add(newItem);
-    }
-
-    cellLineOptions = updated;
-    selectedSourceFilter = 'Custom';
-    selectCellLine(newItem);
-    _saveCustomCellLines();
-  }
-
-  void _deleteCustomCellLine(CellLineOption item) {
-    final deleteId = _customCellIdentity(item);
-
-    cellLineOptions = cellLineOptions.where((e) {
-      return _customCellIdentity(e) != deleteId;
-    }).toList();
-
-    if (selectedCellLine != null &&
-        _customCellIdentity(selectedCellLine!) == deleteId) {
-      selectedCellLine = null;
-      cellLineTextController.clear();
-    }
-
-    _saveCustomCellLines();
-  }
-
-  Future<bool> _confirmDeleteCustomCellLine(CellLineOption item) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Custom cell line 삭제'),
-          content: Text('${item.primaryName} 항목을 삭제할까요?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('삭제'),
-            ),
-          ],
-        );
-      },
-    );
-
-    return confirmed == true;
-  }
-
-  Future<bool> _confirmClearAllCustomCellLines() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      useRootNavigator: true,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('전체 삭제'),
-          content: const Text('저장된 모든 Custom cell line을 삭제할까요?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('전체 삭제'),
-            ),
-          ],
-        );
-      },
-    );
-
-    return confirmed == true;
-  }
-
-  Future<CellLineOption?> _showCustomCellLineEditor({
-    CellLineOption? initial,
-  }) async {
-    final formKey = GlobalKey<FormState>();
-
-    final primaryNameController =
-        TextEditingController(text: initial?.primaryName ?? '');
-    final sourceController = TextEditingController(
-      text:
-          initial?.source == 'CUSTOM' ? 'CUSTOM' : (initial?.source ?? 'CUSTOM'),
-    );
-    final catalogNumberController =
-        TextEditingController(text: initial?.catalogNumber ?? '');
-    final speciesController =
-        TextEditingController(text: initial?.species ?? '');
-    final tissueController =
-        TextEditingController(text: initial?.tissue ?? '');
-    final diseaseController =
-        TextEditingController(text: initial?.disease ?? '');
-    final cvclIdController =
-        TextEditingController(text: initial?.cvclId ?? '');
-    final rridController =
-        TextEditingController(text: initial?.rrid ?? '');
-    final synonymsController =
-        TextEditingController(text: initial?.synonyms.join(', '));
-    final misidentifiedNoteController =
-        TextEditingController(text: initial?.misidentifiedNote ?? '');
-
-    bool isMisidentified = initial?.isMisidentified ?? false;
-
-    final result = await showDialog<CellLineOption?>(
-      context: context,
-      useRootNavigator: true,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, modalSetState) {
-            return AlertDialog(
-              title: Text(
-                initial == null ? 'Custom cell line 추가' : 'Custom cell line 수정',
-              ),
-              content: SizedBox(
-                width: 520,
-                child: SingleChildScrollView(
-                  child: Form(
-                    key: formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextFormField(
-                          controller: primaryNameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Cell name *',
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Cell name을 입력하세요.';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: sourceController,
-                          decoration: const InputDecoration(
-                            labelText: 'Source',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: catalogNumberController,
-                          decoration: const InputDecoration(
-                            labelText: 'Catalog number',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: speciesController,
-                          decoration: const InputDecoration(
-                            labelText: 'Species',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: tissueController,
-                          decoration: const InputDecoration(
-                            labelText: 'Tissue',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: diseaseController,
-                          decoration: const InputDecoration(
-                            labelText: 'Disease',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: cvclIdController,
-                          decoration: const InputDecoration(
-                            labelText: 'CVCL ID',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: rridController,
-                          decoration: const InputDecoration(
-                            labelText: 'RRID',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: synonymsController,
-                          decoration: const InputDecoration(
-                            labelText: 'Synonyms (comma-separated)',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Misidentified'),
-                          value: isMisidentified,
-                          onChanged: (value) {
-                            modalSetState(() {
-                              isMisidentified = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: misidentifiedNoteController,
-                          enabled: isMisidentified,
-                          decoration: const InputDecoration(
-                            labelText: 'Misidentified note',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, null),
-                  child: const Text('취소'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (!(formKey.currentState?.validate() ?? false)) {
-                      return;
-                    }
-
-                    final normalizedName = primaryNameController.text.trim();
-                    final existingByName =
-                        _findExistingCustomCellLineByName(normalizedName);
-
-                    final isDuplicatedCreate =
-                        initial == null && existingByName != null;
-
-                    final isDuplicatedRename = initial != null &&
-                        existingByName != null &&
-                        _customCellIdentity(existingByName) !=
-                            _customCellIdentity(initial);
-
-                    if (isDuplicatedCreate || isDuplicatedRename) {
-                      ScaffoldMessenger.of(dialogContext).showSnackBar(
-                        const SnackBar(
-                          content: Text('같은 이름의 Custom cell line이 이미 있습니다.'),
-                        ),
-                      );
-                      return;
-                    }
-
-                    final synonyms = synonymsController.text
-                        .split(',')
-                        .map((e) => e.trim())
-                        .where((e) => e.isNotEmpty)
-                        .toList();
-
-                    final newItem = _buildCustomCellLineOption(
-                      primaryName: primaryNameController.text,
-                      source: sourceController.text,
-                      catalogNumber: catalogNumberController.text,
-                      synonyms: synonyms,
-                      species: speciesController.text,
-                      tissue: tissueController.text,
-                      disease: diseaseController.text,
-                      cvclId: cvclIdController.text,
-                      rrid: rridController.text,
-                      isMisidentified: isMisidentified,
-                      misidentifiedNote: misidentifiedNoteController.text,
-                    );
-
-                    Navigator.pop(dialogContext, newItem);
-                  },
-                  child: const Text('저장'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    primaryNameController.dispose();
-    sourceController.dispose();
-    catalogNumberController.dispose();
-    speciesController.dispose();
-    tissueController.dispose();
-    diseaseController.dispose();
-    cvclIdController.dispose();
-    rridController.dispose();
-    synonymsController.dispose();
-    misidentifiedNoteController.dispose();
-
-    return result;
-  }
-
-  Future<void> _showCustomCellLinePicker() async {
-    String keyword = '';
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, modalSetState) {
-            final visibleCustomCells = customCellLines.where((cell) {
-              final matchesSpecies = controllerVm.speciesMatches(
-                cell.species,
-                selectedSpeciesFilter,
-              );
-
-              final q = keyword.trim().toLowerCase();
-
-              final matchesKeyword = q.isEmpty ||
-                  cell.primaryName.toLowerCase().contains(q) ||
-                  cell.synonyms.any((s) => s.toLowerCase().contains(q)) ||
-                  cell.catalogNumber.toLowerCase().contains(q) ||
-                  (cell.species ?? '').toLowerCase().contains(q) ||
-                  (cell.tissue ?? '').toLowerCase().contains(q) ||
-                  (cell.disease ?? '').toLowerCase().contains(q);
-
-              return matchesSpecies && matchesKeyword;
-            }).toList()
-              ..sort((a, b) => a.primaryName.compareTo(b.primaryName));
-
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 16,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-              ),
-              child: SizedBox(
-                height: 560,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Custom cell lines',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                        ),
-                        if (customCellLines.isNotEmpty)
-                          TextButton(
-                            onPressed: () async {
-                              final confirmed =
-                                  await _confirmClearAllCustomCellLines();
-                              if (!mounted) return;
-
-                              if (confirmed) {
-                                await _clearAllCustomCellLines();
-                                if (!mounted) return;
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      '모든 Custom cell line이 삭제되었습니다.',
-                                    ),
-                                  ),
-                                );
-                                modalSetState(() {});
-                              }
-                            },
-                            child: const Text('전체 삭제'),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('직접 추가, 수정, 삭제하거나 목록에서 선택하세요.'),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            decoration: const InputDecoration(
-                              labelText: '검색',
-                              hintText:
-                                  'name, species, tissue, catalog number...',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.search),
-                            ),
-                            onChanged: (value) {
-                              modalSetState(() {
-                                keyword = value;
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.icon(
-                          onPressed: () async {
-                            final created = await _showCustomCellLineEditor();
-                            if (!mounted) return;
-
-                            if (created != null) {
-                              setState(() {
-                                _upsertCustomCellLine(created);
-                              });
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Custom cell line이 추가되었습니다.'),
-                                ),
-                              );
-                            }
-
-                            modalSetState(() {});
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('새 Custom'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: visibleCustomCells.isEmpty
-                          ? const Center(
-                              child: Text('등록된 custom cell line이 없습니다.'),
-                            )
-                          : ListView.separated(
-                              itemCount: visibleCustomCells.length,
-                              separatorBuilder: (_, __) =>
-                                  const Divider(height: 1),
-                              itemBuilder: (context, index) {
-                                final cell = visibleCustomCells[index];
-                                final isSelected = selectedCellLine != null &&
-                                    _customCellIdentity(selectedCellLine!) ==
-                                        _customCellIdentity(cell);
-
-                                final meta = <String>[
-                                  cell.source,
-                                  if (cell.catalogNumber.trim().isNotEmpty)
-                                    cell.catalogNumber.trim(),
-                                  if ((cell.species ?? '').trim().isNotEmpty)
-                                    cell.species!.trim(),
-                                  if ((cell.tissue ?? '').trim().isNotEmpty)
-                                    cell.tissue!.trim(),
-                                ];
-
-                                final subLines = <String>[
-                                  meta.join(' • '),
-                                  if ((cell.disease ?? '').trim().isNotEmpty)
-                                    'Disease: ${cell.disease!.trim()}',
-                                  if (cell.synonyms.isNotEmpty)
-                                    'Synonyms: ${cell.synonyms.join(', ')}',
-                                  if ((cell.cvclId ?? '').trim().isNotEmpty)
-                                    'CVCL: ${cell.cvclId!.trim()}',
-                                  if ((cell.rrid ?? '').trim().isNotEmpty)
-                                    'RRID: ${cell.rrid!.trim()}',
-                                  if (cell.isMisidentified)
-                                    'Misidentified${(cell.misidentifiedNote ?? '').trim().isNotEmpty ? ' - ${cell.misidentifiedNote!.trim()}' : ''}',
-                                ];
-
-                                return ListTile(
-                                  isThreeLine: true,
-                                  title: Text(cell.primaryName),
-                                  subtitle: Text(subLines.join('\n')),
-                                  leading: isSelected
-                                      ? const Icon(Icons.check_circle)
-                                      : const Icon(Icons.biotech_outlined),
-                                  onTap: () {
-                                    Navigator.of(sheetContext).pop();
-                                    setState(() {
-                                      selectedSourceFilter = 'Custom';
-                                      selectCellLine(cell);
-                                    });
-                                  },
-                                  trailing: SizedBox(
-                                    width: 96,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          tooltip: '수정',
-                                          onPressed: () async {
-                                            final edited =
-                                                await _showCustomCellLineEditor(
-                                              initial: cell,
-                                            );
-                                            if (!mounted) return;
-
-                                            if (edited != null) {
-                                              setState(() {
-                                                _upsertCustomCellLine(
-                                                  edited,
-                                                  oldItem: cell,
-                                                );
-                                              });
-
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Custom cell line이 수정되었습니다.',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-
-                                            modalSetState(() {});
-                                          },
-                                          icon:
-                                              const Icon(Icons.edit_outlined),
-                                        ),
-                                        IconButton(
-                                          tooltip: '삭제',
-                                          onPressed: () async {
-                                            final confirmed =
-                                                await _confirmDeleteCustomCellLine(
-                                              cell,
-                                            );
-                                            if (!mounted) return;
-
-                                            if (confirmed) {
-                                              setState(() {
-                                                _deleteCustomCellLine(cell);
-                                              });
-
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    'Custom cell line이 삭제되었습니다.',
-                                                  ),
-                                                ),
-                                              );
-                                            }
-
-                                            modalSetState(() {});
-                                          },
-                                          icon:
-                                              const Icon(Icons.delete_outline),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+    await _saveCustomCellLines();
   }
 
   Future<void> exportToExcel() async {
@@ -1265,6 +709,14 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
         requiredMediaVolume: result.requiredMediaVolume,
         requiredMediaVolumeWithExtra: result.requiredMediaVolumeWithExtra,
         extraPercent: data.extraPercent,
+        cultureMedium: data.cultureMedium,
+        serumPercent: data.serumPercent,
+        usePenStrep: data.usePenStrep,
+        useGlutamax: data.useGlutamax,
+        useHepes: data.useHepes,
+        useNeaa: data.useNeaa,
+        useSodiumPyruvate: data.useSodiumPyruvate,
+        mediumNote: data.mediumNote,
         layout: editablePlateLayout,
       );
 
@@ -1317,11 +769,13 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     ValueChanged<String>? onChanged,
     String? Function(String?)? validator,
     List<TextInputFormatter>? inputFormatters,
+    int maxLines = 1,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
+      maxLines: maxLines,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
@@ -1344,7 +798,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
 
   @override
   void dispose() {
-    cellLineTextController.dispose();
     seedingInputController.dispose();
     sampleCountController.dispose();
     replicateController.dispose();
@@ -1356,6 +809,8 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     vehicleCountController.dispose();
     positiveControlCountController.dispose();
     negativeControlCountController.dispose();
+    serumPercentController.dispose();
+    mediumNoteController.dispose();
     super.dispose();
   }
 
@@ -1371,7 +826,26 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
           IconButton(
             onPressed: exportToExcel,
             icon: const Icon(Icons.table_view),
-            tooltip: 'Export Excel',
+            tooltip: 'Excel',
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'export_json') {
+                exportCustomCellLinesToJson();
+              } else if (value == 'import_json') {
+                importCustomCellLinesFromJson();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'export_json',
+                child: Text('Custom 백업 (JSON)'),
+              ),
+              const PopupMenuItem(
+                value: 'import_json',
+                child: Text('Custom 불러오기'),
+              ),
+            ],
           ),
         ],
       ),
@@ -1410,12 +884,9 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                       child: CellCultureCellLineAutocomplete(
                         isLoading: isLoadingCellLines,
                         selectedLabel: selectedCellLine?.displayLabel ?? '',
-                        controller: cellLineTextController,
                         optionsBuilder: filterCellLineOptions,
                         onSelected: (option) {
-                          setState(() {
-                            selectCellLine(option);
-                          });
+                          selectCellLine(option);
                         },
                         onChanged: (text) {
                           if (selectedCellLine != null &&
@@ -1433,9 +904,8 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                     SizedBox(
                       height: 56,
                       child: OutlinedButton.icon(
-                        onPressed: canUseCustomPicker
-                            ? _showCustomCellLinePicker
-                            : null,
+                        onPressed:
+                            canUseCustomPicker ? _openCustomCellLineManager : null,
                         icon: const Icon(Icons.add_box_outlined),
                         label: const Text('Custom'),
                       ),
@@ -1488,9 +958,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
 
                               return OutlinedButton(
                                 onPressed: () {
-                                  setState(() {
-                                    selectCellLine(cell);
-                                  });
+                                  selectCellLine(cell);
                                 },
                                 style: OutlinedButton.styleFrom(
                                   backgroundColor: isSelected
@@ -1539,6 +1007,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   },
                 ),
                 const SizedBox(height: 20),
+
                 buildSectionTitle('Culture Ware'),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
@@ -1562,6 +1031,103 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   },
                 ),
                 const SizedBox(height: 20),
+
+                buildSectionTitle('Culture Medium'),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedCultureMedium,
+                  decoration: const InputDecoration(
+                    labelText: 'Culture medium',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: cultureMediumOptions
+                      .map(
+                        (medium) =>
+                            DropdownMenuItem(value: medium, child: Text(medium)),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      selectedCultureMedium = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Serum (%)',
+                  controller: serumPercentController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: decimalInputFormatters(decimalRange: 2),
+                  validator: (value) =>
+                      validateNonNegativeNumber(value, 'Serum'),
+                  onChanged: (_) => onCalculationInputChanged(),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilterChip(
+                        label: const Text('Pen/Strep'),
+                        selected: usePenStrep,
+                        onSelected: (value) {
+                          setState(() {
+                            usePenStrep = value;
+                          });
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('GlutaMAX'),
+                        selected: useGlutamax,
+                        onSelected: (value) {
+                          setState(() {
+                            useGlutamax = value;
+                          });
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('HEPES'),
+                        selected: useHepes,
+                        onSelected: (value) {
+                          setState(() {
+                            useHepes = value;
+                          });
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('NEAA'),
+                        selected: useNeaa,
+                        onSelected: (value) {
+                          setState(() {
+                            useNeaa = value;
+                          });
+                        },
+                      ),
+                      FilterChip(
+                        label: const Text('Sodium pyruvate'),
+                        selected: useSodiumPyruvate,
+                        onSelected: (value) {
+                          setState(() {
+                            useSodiumPyruvate = value;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Medium note',
+                  controller: mediumNoteController,
+                  maxLines: 2,
+                  onChanged: (_) => onCalculationInputChanged(),
+                ),
+                const SizedBox(height: 20),
+
                 buildSectionTitle('Seeding Conditions'),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<SeedingInputMode>(
@@ -1583,8 +1149,9 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   onChanged: (value) {
                     if (value == null) return;
 
-                    final currentRaw =
-                        double.tryParse(seedingInputController.text.trim());
+                    final currentRaw = parseFormattedDouble(
+                      seedingInputController.text,
+                    );
 
                     setState(() {
                       if (currentRaw != null && currentRaw > 0) {
@@ -1625,8 +1192,8 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                           ? (value) {
                               if (value == null) return;
 
-                              final currentRaw = double.tryParse(
-                                seedingInputController.text.trim(),
+                              final currentRaw = parseFormattedDouble(
+                                seedingInputController.text,
                               );
 
                               setState(() {
@@ -1672,9 +1239,9 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'Normalized: ${normalizedSeedingDensity!.toStringAsFixed(2)} cells/cm²\n'
-                      'Basis plate: ${basisCellsPerWell?.toStringAsFixed(0) ?? '-'} cells/well ($selectedWellBasisWare)\n'
-                      'Actual culture ware: ${actualCellsPerCultureUnit?.toStringAsFixed(0) ?? '-'} cells/well ($selectedWare)',
+                      'Normalized: ${formatDecimalWithComma(normalizedSeedingDensity!)} cells/cm²\n'
+                      'Basis plate: ${basisCellsPerWell != null ? formatIntWithComma(basisCellsPerWell!.round()) : '-'} cells/well ($selectedWellBasisWare)\n'
+                      'Actual culture ware: ${actualCellsPerCultureUnit != null ? formatIntWithComma(actualCellsPerCultureUnit!.round()) : '-'} cells/well ($selectedWare)',
                     ),
                   ),
                 const SizedBox(height: 12),
@@ -1745,8 +1312,9 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                 buildTextField(
                   label: 'Target confluency (%)',
                   controller: targetConfluencyController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: integerInputFormatters(),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: decimalInputFormatters(decimalRange: 2),
                   validator: (value) =>
                       validatePercent0to100(value, 'Target confluency'),
                   onChanged: (_) => onCalculationInputChanged(),
@@ -1807,6 +1375,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   },
                 ),
                 const SizedBox(height: 12),
+
                 buildSectionTitle('Calculated Result'),
                 const SizedBox(height: 8),
                 CellCultureResultCard(
@@ -1819,17 +1388,20 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   actualCellsPerCultureUnit: actualCellsPerCultureUnit,
                 ),
                 const SizedBox(height: 12),
+
                 buildSectionTitle('Suspension Preparation'),
                 const SizedBox(height: 8),
                 CellCultureSuspensionCard(
                   form: data,
                   summary: result,
+                  selectedCellLine: selectedCellLine,
                   selectedSeedingInputMode: selectedSeedingInputMode,
                   selectedWellBasisWare: selectedWellBasisWare,
                   basisCellsPerWell: basisCellsPerWell,
                   actualCellsPerCultureUnit: actualCellsPerCultureUnit,
                 ),
                 const SizedBox(height: 12),
+
                 buildSectionTitle('Plate Layout'),
                 const SizedBox(height: 8),
                 CellCulturePlateLayoutSection(
@@ -1851,6 +1423,19 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                     });
                   },
                 ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: exportToExcel,
+                    icon: const Icon(Icons.table_view),
+                    label: const Text('엑셀로 내보내기'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
