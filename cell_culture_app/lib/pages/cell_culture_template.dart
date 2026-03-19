@@ -34,6 +34,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   final _formKey = GlobalKey<FormState>();
   final controllerVm = CellCultureTemplateController();
 
+  final TextEditingController cellLineTextController = TextEditingController();
   final TextEditingController seedingInputController =
       TextEditingController(text: '50000');
   final TextEditingController sampleCountController =
@@ -126,6 +127,22 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     final density = normalizedSeedingDensity;
     if (density == null) return null;
     return density * currentSurfaceArea;
+  }
+
+  List<CellLineOption> get customCellLines => cellLineOptions
+      .where((e) => e.source.toUpperCase() == 'CUSTOM')
+      .toList()
+    ..sort((a, b) => a.primaryName.compareTo(b.primaryName));
+
+  bool get canUseCustomPicker =>
+      selectedSourceFilter == 'All' || selectedSourceFilter == 'Custom';
+
+  void selectCellLine(CellLineOption option) {
+    selectedCellLine = option;
+    cellLineTextController.text = option.displayLabel;
+    applyRecommendedDensity(cellLine: option, force: true);
+    autoGenerateLayout = true;
+    editablePlateLayout = buildGeneratedLayout();
   }
 
   CellCultureFormData get formData => CellCultureFormData.fromRaw(
@@ -329,6 +346,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       setState(() {
         cellLineOptions = items;
         selectedCellLine = matched;
+        cellLineTextController.text = matched?.displayLabel ?? '';
         if (matched != null) {
           autoGenerateLayout = true;
           editablePlateLayout = buildGeneratedLayout();
@@ -342,6 +360,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       setState(() {
         isLoadingCellLines = false;
         selectedCellLine = null;
+        cellLineTextController.clear();
       });
     }
   }
@@ -360,6 +379,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
 
     if (!sourceOk || !speciesOk) {
       selectedCellLine = null;
+      cellLineTextController.clear();
     }
   }
 
@@ -484,6 +504,222 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     );
   }
 
+  CellLineOption? _findExistingCustomCellLine(String input) {
+    final normalizedInput =
+        CellLineCatalogService.normalizeCellLineText(input.trim());
+
+    for (final item in customCellLines) {
+      final normalizedName =
+          CellLineCatalogService.normalizeCellLineText(item.primaryName);
+      if (normalizedName == normalizedInput) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  CellLineOption _createCustomCellLine(String input) {
+    final trimmed = input.trim();
+
+    final String? species =
+        selectedSpeciesFilter == 'All' ? null : selectedSpeciesFilter;
+
+    final catalogNumber =
+        'CUSTOM-${trimmed.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]+'), '-')}';
+
+    return CellLineOption(
+      primaryName: trimmed,
+      synonyms: const [],
+      source: 'CUSTOM',
+      catalogNumber: catalogNumber,
+      species: species,
+      cvclId: null,
+      rrid: null,
+      tissue: null,
+      disease: null,
+      isMisidentified: false,
+      misidentifiedNote: null,
+    );
+  }
+
+  void _selectOrCreateCustomCellLine(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return;
+
+    final existing = _findExistingCustomCellLine(trimmed);
+    final target = existing ?? _createCustomCellLine(trimmed);
+
+    setState(() {
+      if (existing == null) {
+        cellLineOptions = [...cellLineOptions, target];
+      }
+      selectedSourceFilter = 'Custom';
+      selectCellLine(target);
+    });
+  }
+
+  Future<void> _showCustomCellLinePicker() async {
+    final inputController = TextEditingController(
+      text: selectedCellLine?.source.toUpperCase() == 'CUSTOM'
+          ? selectedCellLine?.primaryName ?? ''
+          : '',
+    );
+
+    String keyword = inputController.text.trim();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, modalSetState) {
+            final visibleCustomCells = customCellLines.where((cell) {
+              final matchesSpecies = controllerVm.speciesMatches(
+                cell.species,
+                selectedSpeciesFilter,
+              );
+
+              final matchesKeyword = keyword.isEmpty ||
+                  cell.primaryName.toLowerCase().contains(
+                        keyword.toLowerCase(),
+                      ) ||
+                  cell.synonyms.any(
+                    (s) => s.toLowerCase().contains(keyword.toLowerCase()),
+                  );
+
+              return matchesSpecies && matchesKeyword;
+            }).toList()
+              ..sort((a, b) => a.primaryName.compareTo(b.primaryName));
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+              ),
+              child: SizedBox(
+                height: 520,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Custom cell line',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('직접 입력하거나 아래 목록에서 선택하세요.'),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: inputController,
+                      autofocus: true,
+                      decoration: InputDecoration(
+                        labelText: 'Custom cell line name',
+                        hintText: '예: MyCustomCell',
+                        border: const OutlineInputBorder(),
+                        suffixIcon: inputController.text.trim().isEmpty
+                            ? null
+                            : IconButton(
+                                onPressed: () {
+                                  inputController.clear();
+                                  modalSetState(() {
+                                    keyword = '';
+                                  });
+                                },
+                                icon: const Icon(Icons.clear),
+                              ),
+                      ),
+                      onChanged: (value) {
+                        modalSetState(() {
+                          keyword = value.trim();
+                        });
+                      },
+                      onSubmitted: (value) {
+                        final v = value.trim();
+                        if (v.isEmpty) return;
+                        Navigator.of(sheetContext).pop();
+                        _selectOrCreateCustomCellLine(v);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () {
+                              final v = inputController.text.trim();
+                              if (v.isEmpty) return;
+                              Navigator.of(sheetContext).pop();
+                              _selectOrCreateCustomCellLine(v);
+                            },
+                            icon: const Icon(Icons.check),
+                            label: const Text('직접 입력값 사용'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Saved custom cell lines',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: visibleCustomCells.isEmpty
+                          ? const Center(
+                              child: Text('표시할 custom cell line이 없습니다.'),
+                            )
+                          : ListView.separated(
+                              itemCount: visibleCustomCells.length,
+                              separatorBuilder: (_, __) =>
+                                  const Divider(height: 1),
+                              itemBuilder: (context, index) {
+                                final cell = visibleCustomCells[index];
+                                final isSelected =
+                                    selectedCellLine?.primaryName ==
+                                            cell.primaryName &&
+                                        selectedCellLine?.source == cell.source &&
+                                        selectedCellLine?.catalogNumber ==
+                                            cell.catalogNumber;
+
+                                final subtitleParts = <String>[
+                                  cell.source,
+                                  if ((cell.species ?? '').trim().isNotEmpty)
+                                    cell.species!.trim(),
+                                  if (cell.catalogNumber.trim().isNotEmpty)
+                                    cell.catalogNumber.trim(),
+                                ];
+
+                                return ListTile(
+                                  title: Text(cell.primaryName),
+                                  subtitle: Text(subtitleParts.join(' • ')),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check_circle)
+                                      : null,
+                                  onTap: () {
+                                    Navigator.of(sheetContext).pop();
+                                    setState(() {
+                                      selectedSourceFilter = 'Custom';
+                                      selectCellLine(cell);
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    inputController.dispose();
+  }
+
   Future<void> exportToExcel() async {
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) {
@@ -499,7 +735,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     if (selectedCellLine == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cell line은 ATCC 또는 KCLB catalog에서 선택해야 합니다.'),
+          content: Text('Cell line은 catalog에서 선택하거나 custom으로 입력해야 합니다.'),
         ),
       );
       return;
@@ -615,6 +851,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
 
   @override
   void dispose() {
+    cellLineTextController.dispose();
     seedingInputController.dispose();
     sampleCountController.dispose();
     replicateController.dispose();
@@ -673,21 +910,108 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   },
                 ),
                 const SizedBox(height: 12),
-                CellCultureCellLineAutocomplete(
-                  isLoading: isLoadingCellLines,
-                  selectedLabel: selectedCellLine?.displayLabel ?? '',
-                  optionsBuilder: filterCellLineOptions,
-                  onSelected: (option) {
-                    selectedCellLine = option;
-                    applyRecommendedDensity(cellLine: option, force: true);
-                    autoGenerateLayout = true;
-                    editablePlateLayout = buildGeneratedLayout();
-                    setState(() {});
-                  },
-                  onChanged: (_) {
-                    setState(() {
-                      selectedCellLine = null;
-                    });
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: CellCultureCellLineAutocomplete(
+                        isLoading: isLoadingCellLines,
+                        selectedLabel: selectedCellLine?.displayLabel ?? '',
+                        controller: cellLineTextController,
+                        optionsBuilder: filterCellLineOptions,
+                        onSelected: (option) {
+                          setState(() {
+                            selectCellLine(option);
+                          });
+                        },
+                        onChanged: (text) {
+                          if (selectedCellLine != null &&
+                              text.trim() == selectedCellLine!.displayLabel) {
+                            return;
+                          }
+
+                          setState(() {
+                            selectedCellLine = null;
+                          });
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: canUseCustomPicker
+                            ? _showCustomCellLinePicker
+                            : null,
+                        icon: const Icon(Icons.add_box_outlined),
+                        label: const Text('Custom'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Builder(
+                  builder: (context) {
+                    final visibleCustomCells = customCellLines.where((cell) {
+                      final matchesSource = selectedSourceFilter == 'All' ||
+                          cell.source.toUpperCase() ==
+                              selectedSourceFilter.toUpperCase();
+
+                      final matchesSpecies = controllerVm.speciesMatches(
+                        cell.species,
+                        selectedSpeciesFilter,
+                      );
+
+                      return matchesSource && matchesSpecies;
+                    }).toList();
+
+                    if (visibleCustomCells.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Custom cell lines',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: visibleCustomCells.map((cell) {
+                              final isSelected = selectedCellLine?.primaryName ==
+                                      cell.primaryName &&
+                                  selectedCellLine?.source == cell.source &&
+                                  selectedCellLine?.catalogNumber ==
+                                      cell.catalogNumber;
+
+                              return OutlinedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    selectCellLine(cell);
+                                  });
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  backgroundColor: isSelected
+                                      ? Theme.of(context)
+                                          .colorScheme
+                                          .primaryContainer
+                                      : null,
+                                ),
+                                child: Text(cell.primaryName),
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(height: 12),
@@ -709,14 +1033,15 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   }).toList(),
                   onChanged: (value) {
                     if (value == null) return;
-                    selectedAssay = value;
-                    applyRecommendedDensity(
-                      cellLine: selectedCellLine,
-                      force: true,
-                    );
-                    autoGenerateLayout = true;
-                    editablePlateLayout = buildGeneratedLayout();
-                    setState(() {});
+                    setState(() {
+                      selectedAssay = value;
+                      applyRecommendedDensity(
+                        cellLine: selectedCellLine,
+                        force: true,
+                      );
+                      autoGenerateLayout = true;
+                      editablePlateLayout = buildGeneratedLayout();
+                    });
                   },
                 ),
                 const SizedBox(height: 20),
@@ -849,9 +1174,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest,
+                      color: Theme.of(context).colorScheme.surfaceVariant,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
