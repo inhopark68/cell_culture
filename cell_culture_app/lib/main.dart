@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'pages/pcr_template.dart';
-import 'pages/cell_culture_template.dart';
+import 'pages/cell_culture_template_page.dart';
 import 'pages/elisa_template.dart';
 import 'pages/mrna_cdna_template.dart';
 import 'pages/western_blot_template.dart';
