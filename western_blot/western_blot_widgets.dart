@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'western_blot_calculator.dart';
 import 'western_blot_models.dart';
 
-class SectionTitle extends StatelessWidget {
+class WesternSectionTitle extends StatelessWidget {
   final String title;
 
-  const SectionTitle(this.title, {super.key});
+  const WesternSectionTitle({
+    super.key,
+    required this.title,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,14 +26,14 @@ class SectionTitle extends StatelessWidget {
   }
 }
 
-class AppTextField extends StatelessWidget {
+class WesternTextField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final TextInputType keyboardType;
   final VoidCallback? onChanged;
   final int maxLines;
 
-  const AppTextField({
+  const WesternTextField({
     super.key,
     required this.label,
     required this.controller,
@@ -53,13 +57,13 @@ class AppTextField extends StatelessWidget {
   }
 }
 
-class AppDropdownField extends StatelessWidget {
+class WesternDropdownField extends StatelessWidget {
   final String label;
   final String value;
   final List<String> items;
   final ValueChanged<String?> onChanged;
 
-  const AppDropdownField({
+  const WesternDropdownField({
     super.key,
     required this.label,
     required this.value,
@@ -76,24 +80,19 @@ class AppDropdownField extends StatelessWidget {
         border: const OutlineInputBorder(),
       ),
       items: items
-          .map(
-            (e) => DropdownMenuItem(
-              value: e,
-              child: Text(e),
-            ),
-          )
+          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
           .toList(),
       onChanged: onChanged,
     );
   }
 }
 
-class AppSwitchTile extends StatelessWidget {
+class WesternSwitchTile extends StatelessWidget {
   final String title;
   final bool value;
   final ValueChanged<bool> onChanged;
 
-  const AppSwitchTile({
+  const WesternSwitchTile({
     super.key,
     required this.title,
     required this.value,
@@ -143,45 +142,6 @@ class InfoRow extends StatelessWidget {
   }
 }
 
-class SummaryCard extends StatelessWidget {
-  final List<Widget> children;
-
-  const SummaryCard({super.key, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(children: children),
-      ),
-    );
-  }
-}
-
-class GreyCard extends StatelessWidget {
-  final List<Widget> children;
-  final double elevation;
-
-  const GreyCard({
-    super.key,
-    required this.children,
-    this.elevation = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: elevation,
-      color: Colors.grey.shade100,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(children: children),
-      ),
-    );
-  }
-}
-
 class LegendWidget extends StatelessWidget {
   const LegendWidget({super.key});
 
@@ -215,14 +175,12 @@ class GelRecipeCard extends StatelessWidget {
   final String title;
   final String trisLabel;
   final GelMixRecipe recipe;
-  final String Function(double valueMl) formatMlOrUl;
 
   const GelRecipeCard({
     super.key,
     required this.title,
     required this.trisLabel,
     required this.recipe,
-    required this.formatMlOrUl,
   });
 
   @override
@@ -244,134 +202,35 @@ class GelRecipeCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            InfoRow(label: 'Total volume', value: formatMlOrUl(recipe.totalMl)),
+            InfoRow(
+              label: 'Total volume',
+              value: WesternBlotCalculator.formatMlOrUl(recipe.totalMl),
+            ),
             InfoRow(
               label: '30% Acrylamide/Bis',
-              value: formatMlOrUl(recipe.acrylamideMl),
+              value: WesternBlotCalculator.formatMlOrUl(recipe.acrylamideMl),
             ),
-            InfoRow(label: trisLabel, value: formatMlOrUl(recipe.trisMl)),
-            InfoRow(label: '10% SDS', value: formatMlOrUl(recipe.sdsMl)),
-            InfoRow(label: '10% APS', value: formatMlOrUl(recipe.apsMl)),
-            InfoRow(label: 'TEMED', value: formatMlOrUl(recipe.temedMl)),
-            InfoRow(label: 'DW', value: formatMlOrUl(recipe.waterMl)),
+            InfoRow(
+              label: trisLabel,
+              value: WesternBlotCalculator.formatMlOrUl(recipe.trisMl),
+            ),
+            InfoRow(
+              label: '10% SDS',
+              value: WesternBlotCalculator.formatMlOrUl(recipe.sdsMl),
+            ),
+            InfoRow(
+              label: '10% APS',
+              value: WesternBlotCalculator.formatMlOrUl(recipe.apsMl),
+            ),
+            InfoRow(
+              label: 'TEMED',
+              value: WesternBlotCalculator.formatMlOrUl(recipe.temedMl),
+            ),
+            InfoRow(
+              label: 'DW',
+              value: WesternBlotCalculator.formatMlOrUl(recipe.waterMl),
+            ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class SampleCard extends StatelessWidget {
-  final WesternSampleRow row;
-  final String selectedSampleReplicate;
-  final String sampleWellLabel;
-  final Color statusColor;
-  final String statusText;
-  final double corrected;
-  final double concentration;
-  final double loadingProteinAmountUg;
-  final double loadingVolume;
-  final VoidCallback onTap;
-
-  const SampleCard({
-    super.key,
-    required this.row,
-    required this.selectedSampleReplicate,
-    required this.sampleWellLabel,
-    required this.statusColor,
-    required this.statusText,
-    required this.corrected,
-    required this.concentration,
-    required this.loadingProteinAmountUg,
-    required this.loadingVolume,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: statusColor,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          row.sampleName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '$selectedSampleReplicate $sampleWellLabel',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Chip(
-                    label: Text(statusText),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ...List.generate(row.absorbances.length, (i) {
-                return InfoRow(
-                  label: 'Raw absorbance ${i + 1}',
-                  value: row.absorbances[i].toStringAsFixed(3),
-                );
-              }),
-              InfoRow(
-                label: 'Average raw absorbance',
-                value: row.averageAbsorbance.toStringAsFixed(3),
-              ),
-              InfoRow(
-                label: 'Corrected absorbance',
-                value: corrected.toStringAsFixed(3),
-              ),
-              InfoRow(
-                label: 'Dilution factor',
-                value: row.dilutionFactor.toStringAsFixed(2),
-              ),
-              InfoRow(
-                label: 'Protein concentration',
-                value: '${concentration.toStringAsFixed(4)} µg/µL',
-              ),
-              InfoRow(
-                label: 'Target loading amount',
-                value: '${loadingProteinAmountUg.toStringAsFixed(2)} µg',
-              ),
-              InfoRow(
-                label: 'Loading volume',
-                value: '${loadingVolume.toStringAsFixed(2)} µL',
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  'Tap to edit',
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -383,7 +242,8 @@ class StandardCard extends StatelessWidget {
   final WesternStandardRow row;
   final String selectedStandardReplicate;
   final String standardWellLabel;
-  final double correctedAvg;
+  final bool useBlankCorrection;
+  final double blankAbsorbance;
   final VoidCallback onTap;
 
   const StandardCard({
@@ -392,12 +252,17 @@ class StandardCard extends StatelessWidget {
     required this.row,
     required this.selectedStandardReplicate,
     required this.standardWellLabel,
-    required this.correctedAvg,
+    required this.useBlankCorrection,
+    required this.blankAbsorbance,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final correctedAvg = useBlankCorrection
+        ? row.averageAbsorbance - blankAbsorbance
+        : row.averageAbsorbance;
+
     return Card(
       child: InkWell(
         onTap: onTap,
@@ -467,6 +332,165 @@ class StandardCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class SampleCard extends StatelessWidget {
+  final WesternSampleRow row;
+  final String selectedSampleReplicate;
+  final String sampleWellLabel;
+  final Color statusColor;
+  final String statusText;
+  final double correctedAbsorbance;
+  final double concentrationUgPerUl;
+  final double loadingProteinAmountUg;
+  final double loadingVolumeUl;
+  final VoidCallback onTap;
+
+  const SampleCard({
+    super.key,
+    required this.row,
+    required this.selectedSampleReplicate,
+    required this.sampleWellLabel,
+    required this.statusColor,
+    required this.statusText,
+    required this.correctedAbsorbance,
+    required this.concentrationUgPerUl,
+    required this.loadingProteinAmountUg,
+    required this.loadingVolumeUl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: statusColor,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          row.sampleName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$selectedSampleReplicate $sampleWellLabel',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Chip(
+                    label: Text(statusText),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...List.generate(row.absorbances.length, (i) {
+                return InfoRow(
+                  label: 'Raw absorbance ${i + 1}',
+                  value: row.absorbances[i].toStringAsFixed(3),
+                );
+              }),
+              InfoRow(
+                label: 'Average raw absorbance',
+                value: row.averageAbsorbance.toStringAsFixed(3),
+              ),
+              InfoRow(
+                label: 'Corrected absorbance',
+                value: correctedAbsorbance.toStringAsFixed(3),
+              ),
+              InfoRow(
+                label: 'Dilution factor',
+                value: row.dilutionFactor.toStringAsFixed(2),
+              ),
+              InfoRow(
+                label: 'Protein concentration',
+                value: '${concentrationUgPerUl.toStringAsFixed(4)} µg/µL',
+              ),
+              InfoRow(
+                label: 'Target loading amount',
+                value: '${loadingProteinAmountUg.toStringAsFixed(2)} µg',
+              ),
+              InfoRow(
+                label: 'Loading volume',
+                value: '${loadingVolumeUl.toStringAsFixed(2)} µL',
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'Tap to edit',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SummaryCard extends StatelessWidget {
+  final List<Widget> rows;
+
+  const SummaryCard({
+    super.key,
+    required this.rows,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(children: rows),
+      ),
+    );
+  }
+}
+
+class GrayCard extends StatelessWidget {
+  final List<Widget> rows;
+  final double elevation;
+
+  const GrayCard({
+    super.key,
+    required this.rows,
+    this.elevation = 1,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: elevation,
+      color: Colors.grey.shade100,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(children: rows),
       ),
     );
   }

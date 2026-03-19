@@ -38,9 +38,8 @@ Future<WesternSampleRow?> showEditSampleDialog({
   required String sampleWellLabel,
 }) async {
   final nameController = TextEditingController(text: row.sampleName);
-  final dilutionController = TextEditingController(
-    text: row.dilutionFactor.toString(),
-  );
+  final dilutionController =
+      TextEditingController(text: row.dilutionFactor.toString());
 
   final absorbanceControllers = List.generate(
     sampleReplicateCount,
