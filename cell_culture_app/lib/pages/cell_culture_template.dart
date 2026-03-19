@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/cell_culture_form_data.dart';
@@ -30,6 +33,7 @@ class CellCultureTemplatePage extends StatefulWidget {
 
 class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   static const int maxCellLineSuggestions = 300;
+  static const String _customCellLinesPrefsKey = 'custom_cell_lines_v1';
 
   final _formKey = GlobalKey<FormState>();
   final controllerVm = CellCultureTemplateController();
@@ -325,6 +329,61 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     });
   }
 
+  Future<void> _loadSavedCustomCellLines() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawList = prefs.getStringList(_customCellLinesPrefsKey) ?? const [];
+
+      final savedItems = rawList
+          .map((e) => jsonDecode(e) as Map<String, dynamic>)
+          .map(CellLineOption.fromJson)
+          .where((e) => e.source.toUpperCase() == 'CUSTOM')
+          .toList();
+
+      if (!mounted || savedItems.isEmpty) return;
+
+      final existingIds = cellLineOptions.map(_customCellIdentity).toSet();
+      final merged = [...cellLineOptions];
+
+      for (final item in savedItems) {
+        if (!existingIds.contains(_customCellIdentity(item))) {
+          merged.add(item);
+        }
+      }
+
+      setState(() {
+        cellLineOptions = merged;
+      });
+    } catch (e) {
+      debugPrint('Failed to load saved custom cell lines: $e');
+    }
+  }
+
+  Future<void> _saveCustomCellLines() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = customCellLines.map((e) => jsonEncode(e.toJson())).toList();
+      await prefs.setStringList(_customCellLinesPrefsKey, encoded);
+    } catch (e) {
+      debugPrint('Failed to save custom cell lines: $e');
+    }
+  }
+
+  Future<void> _clearAllCustomCellLines() async {
+    setState(() {
+      cellLineOptions = cellLineOptions
+          .where((e) => e.source.toUpperCase() != 'CUSTOM')
+          .toList();
+
+      if (selectedCellLine?.source.toUpperCase() == 'CUSTOM') {
+        selectedCellLine = null;
+        cellLineTextController.clear();
+      }
+    });
+
+    await _saveCustomCellLines();
+  }
+
   Future<void> _loadCellLines() async {
     try {
       final items = await CellLineCatalogService.loadCatalog();
@@ -353,6 +412,8 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
         }
         isLoadingCellLines = false;
       });
+
+      await _loadSavedCustomCellLines();
     } catch (e) {
       debugPrint('Failed to load cell lines: $e');
       if (!mounted) return;
@@ -597,6 +658,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     cellLineOptions = updated;
     selectedSourceFilter = 'Custom';
     selectCellLine(newItem);
+    _saveCustomCellLines();
   }
 
   void _deleteCustomCellLine(CellLineOption item) {
@@ -611,6 +673,8 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       selectedCellLine = null;
       cellLineTextController.clear();
     }
+
+    _saveCustomCellLines();
   }
 
   Future<bool> _confirmDeleteCustomCellLine(CellLineOption item) async {
@@ -629,6 +693,31 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
             FilledButton(
               onPressed: () => Navigator.pop(context, true),
               child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return confirmed == true;
+  }
+
+  Future<bool> _confirmClearAllCustomCellLines() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('전체 삭제'),
+          content: const Text('저장된 모든 Custom cell line을 삭제할까요?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('전체 삭제'),
             ),
           ],
         );
@@ -908,9 +997,38 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Custom cell lines',
-                      style: Theme.of(context).textTheme.titleLarge,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Custom cell lines',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        if (customCellLines.isNotEmpty)
+                          TextButton(
+                            onPressed: () async {
+                              final confirmed =
+                                  await _confirmClearAllCustomCellLines();
+                              if (!mounted) return;
+
+                              if (confirmed) {
+                                await _clearAllCustomCellLines();
+                                if (!mounted) return;
+
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      '모든 Custom cell line이 삭제되었습니다.',
+                                    ),
+                                  ),
+                                );
+                                modalSetState(() {});
+                              }
+                            },
+                            child: const Text('전체 삭제'),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     const Text('직접 추가, 수정, 삭제하거나 목록에서 선택하세요.'),
