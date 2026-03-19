@@ -59,6 +59,12 @@ class CellLineOption {
     };
   }
 
+  /// 기존 코드 호환용
+  String get name => primaryName;
+
+  /// 기존 alias 기반 코드 호환용
+  List<String> get aliases => synonyms;
+
   String get displayLabel => '$primaryName ($source $catalogNumber)';
 
   String get exportLabel => '$primaryName ($source $catalogNumber)';

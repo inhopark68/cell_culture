@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/services.dart' show rootBundle;
+
 import '../models/cell_line_option.dart';
 
 class CellLineCatalogService {
@@ -15,5 +16,38 @@ class CellLineCatalogService {
 
     _cache = list;
     return list;
+  }
+
+  static String normalizeCellLineText(String input) {
+    return input
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\s\-_./()]+'), '');
+  }
+
+  static bool hasAlias(CellLineOption item, String query) {
+    final normalizedQuery = normalizeCellLineText(query);
+    if (normalizedQuery.isEmpty) return false;
+
+    if (normalizeCellLineText(item.primaryName) == normalizedQuery) {
+      return true;
+    }
+
+    for (final synonym in item.synonyms) {
+      if (normalizeCellLineText(synonym) == normalizedQuery) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  static bool matchesQuery(CellLineOption item, String query) {
+    final normalizedQuery = normalizeCellLineText(query);
+    if (normalizedQuery.isEmpty) return true;
+
+    return item.searchableTexts.any(
+      (text) => normalizeCellLineText(text).contains(normalizedQuery),
+    );
   }
 }

@@ -159,12 +159,19 @@ class CellCultureTemplateController {
     CellLineOption? cellLine,
   }) {
     if (cellLine != null) {
-      final byName = recommendedDensityByCellLine[cellLine.name];
-      if (byName != null) return byName;
+      final byPrimaryName =
+          recommendedDensityByCellLine[cellLine.primaryName];
+      if (byPrimaryName != null) return byPrimaryName;
 
-      final normalized = normalizeSpeciesKey(cellLine.species);
-      if (normalized != null) {
-        final bySpecies = recommendedDensityBySpeciesAndAssay[normalized];
+      for (final synonym in cellLine.synonyms) {
+        final bySynonym = recommendedDensityByCellLine[synonym];
+        if (bySynonym != null) return bySynonym;
+      }
+
+      final normalizedSpecies = normalizeSpeciesKey(cellLine.species);
+      if (normalizedSpecies != null) {
+        final bySpecies =
+            recommendedDensityBySpeciesAndAssay[normalizedSpecies];
         if (bySpecies != null) return bySpecies[assay];
       }
     }
@@ -237,7 +244,8 @@ class CellCultureTemplateController {
       requiredCellSuspensionVolume: requiredCellSuspensionVolume,
     );
 
-    final requiredMediaVolumeWithExtra = CellCultureCalculator.requiredMediaVolume(
+    final requiredMediaVolumeWithExtra =
+        CellCultureCalculator.requiredMediaVolume(
       totalSeedingVolume: totalSeedingVolumeWithExtra,
       requiredCellSuspensionVolume: requiredCellSuspensionVolumeWithExtra,
     );
