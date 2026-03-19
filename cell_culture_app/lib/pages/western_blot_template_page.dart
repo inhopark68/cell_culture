@@ -64,6 +64,36 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
   final TextEditingController sampleDilutionFactorController =
       TextEditingController(text: '1');
 
+  // SDS-PAGE gel preparation
+  String selectedGelPreparationType = 'Mini hand-cast';
+  String selectedGradientRange = '4-20%';
+  String selectedGelThickness = '1.0 mm';
+  String selectedCombTeeth = '10';
+
+  final TextEditingController gelCountController =
+      TextEditingController(text: '1');
+  final TextEditingController resolvingPercentController =
+      TextEditingController(text: '10');
+  final TextEditingController stackingPercentController =
+      TextEditingController(text: '4');
+  final TextEditingController resolvingVolumePerGelController =
+      TextEditingController(text: '4.0');
+  final TextEditingController stackingVolumePerGelController =
+      TextEditingController(text: '1.5');
+  final TextEditingController gelExtraPercentController =
+      TextEditingController(text: '10');
+
+  final TextEditingController acrylamideStockPercentController =
+      TextEditingController(text: '30');
+  final TextEditingController trisResolvingStockController =
+      TextEditingController(text: '1.5');
+  final TextEditingController trisStackingStockController =
+      TextEditingController(text: '0.5');
+  final TextEditingController sdsStockPercentController =
+      TextEditingController(text: '10');
+  final TextEditingController apsStockPercentController =
+      TextEditingController(text: '10');
+
   String selectedTargetForm = 'Phospho form';
   String selectedMembrane = 'Nitrocellulose';
   String selectedBlockingBuffer = '5% BSA';
@@ -103,6 +133,47 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
 
   double get defaultDilutionFactor =>
       double.tryParse(sampleDilutionFactorController.text) ?? 1.0;
+
+  bool get isHandCast => selectedGelPreparationType == 'Mini hand-cast';
+  bool get isPrecast => selectedGelPreparationType == 'Gradient precast';
+
+  int get gelCount => int.tryParse(gelCountController.text) ?? 1;
+
+  double get resolvingPercent =>
+      double.tryParse(resolvingPercentController.text) ?? 10.0;
+
+  double get stackingPercent =>
+      double.tryParse(stackingPercentController.text) ?? 4.0;
+
+  double get resolvingVolumePerGelMl =>
+      double.tryParse(resolvingVolumePerGelController.text) ?? 4.0;
+
+  double get stackingVolumePerGelMl =>
+      double.tryParse(stackingVolumePerGelController.text) ?? 1.5;
+
+  double get gelExtraPercent =>
+      double.tryParse(gelExtraPercentController.text) ?? 10.0;
+
+  double get acrylamideStockPercent =>
+      double.tryParse(acrylamideStockPercentController.text) ?? 30.0;
+
+  double get trisResolvingStockM =>
+      double.tryParse(trisResolvingStockController.text) ?? 1.5;
+
+  double get trisStackingStockM =>
+      double.tryParse(trisStackingStockController.text) ?? 0.5;
+
+  double get sdsStockPercent =>
+      double.tryParse(sdsStockPercentController.text) ?? 10.0;
+
+  double get apsStockPercent =>
+      double.tryParse(apsStockPercentController.text) ?? 10.0;
+
+  double get resolvingTotalMl =>
+      resolvingVolumePerGelMl * gelCount * (1 + gelExtraPercent / 100);
+
+  double get stackingTotalMl =>
+      stackingVolumePerGelMl * gelCount * (1 + gelExtraPercent / 100);
 
   int get standardReplicateCount {
     switch (selectedStandardReplicate) {
@@ -209,6 +280,7 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
     super.initState();
     initializeStandards();
     syncSamplesFromInput();
+    applyDefaultGelVolumes();
   }
 
   @override
@@ -235,6 +307,19 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
     bcaWavelengthController.dispose();
     bcaIncubationController.dispose();
     sampleDilutionFactorController.dispose();
+
+    gelCountController.dispose();
+    resolvingPercentController.dispose();
+    stackingPercentController.dispose();
+    resolvingVolumePerGelController.dispose();
+    stackingVolumePerGelController.dispose();
+    gelExtraPercentController.dispose();
+    acrylamideStockPercentController.dispose();
+    trisResolvingStockController.dispose();
+    trisStackingStockController.dispose();
+    sdsStockPercentController.dispose();
+    apsStockPercentController.dispose();
+
     super.dispose();
   }
 
@@ -417,6 +502,101 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
         );
       }
     });
+  }
+
+  void applyDefaultGelVolumes() {
+    double resolving = 4.0;
+    double stacking = 1.5;
+
+    if (selectedGelThickness == '0.75 mm') {
+      if (selectedCombTeeth == '10') {
+        resolving = 3.5;
+        stacking = 1.2;
+      } else if (selectedCombTeeth == '15') {
+        resolving = 3.8;
+        stacking = 1.3;
+      }
+    } else if (selectedGelThickness == '1.0 mm') {
+      if (selectedCombTeeth == '10') {
+        resolving = 4.0;
+        stacking = 1.5;
+      } else if (selectedCombTeeth == '15') {
+        resolving = 4.4;
+        stacking = 1.7;
+      }
+    } else if (selectedGelThickness == '1.5 mm') {
+      if (selectedCombTeeth == '10') {
+        resolving = 5.5;
+        stacking = 2.0;
+      } else if (selectedCombTeeth == '15') {
+        resolving = 6.0;
+        stacking = 2.3;
+      }
+    }
+
+    resolvingVolumePerGelController.text = resolving.toStringAsFixed(1);
+    stackingVolumePerGelController.text = stacking.toStringAsFixed(1);
+  }
+
+  GelMixRecipe calculateResolvingRecipe() {
+    const trisFinalM = 0.375;
+    const sdsFinalPercent = 0.1;
+    const apsFinalPercent = 0.05;
+    const temedFraction = 0.0005;
+
+    final totalMl = resolvingTotalMl;
+
+    final acrylamideMl = totalMl * (resolvingPercent / acrylamideStockPercent);
+    final trisMl = totalMl * (trisFinalM / trisResolvingStockM);
+    final sdsMl = totalMl * (sdsFinalPercent / sdsStockPercent);
+    final apsMl = totalMl * (apsFinalPercent / apsStockPercent);
+    final temedMl = totalMl * temedFraction;
+    final waterMl =
+        totalMl - acrylamideMl - trisMl - sdsMl - apsMl - temedMl;
+
+    return GelMixRecipe(
+      totalMl: totalMl,
+      acrylamideMl: acrylamideMl,
+      trisMl: trisMl,
+      sdsMl: sdsMl,
+      apsMl: apsMl,
+      temedMl: temedMl,
+      waterMl: waterMl,
+    );
+  }
+
+  GelMixRecipe calculateStackingRecipe() {
+    const trisFinalM = 0.125;
+    const sdsFinalPercent = 0.1;
+    const apsFinalPercent = 0.05;
+    const temedFraction = 0.0005;
+
+    final totalMl = stackingTotalMl;
+
+    final acrylamideMl = totalMl * (stackingPercent / acrylamideStockPercent);
+    final trisMl = totalMl * (trisFinalM / trisStackingStockM);
+    final sdsMl = totalMl * (sdsFinalPercent / sdsStockPercent);
+    final apsMl = totalMl * (apsFinalPercent / apsStockPercent);
+    final temedMl = totalMl * temedFraction;
+    final waterMl =
+        totalMl - acrylamideMl - trisMl - sdsMl - apsMl - temedMl;
+
+    return GelMixRecipe(
+      totalMl: totalMl,
+      acrylamideMl: acrylamideMl,
+      trisMl: trisMl,
+      sdsMl: sdsMl,
+      apsMl: apsMl,
+      temedMl: temedMl,
+      waterMl: waterMl,
+    );
+  }
+
+  String formatMlOrUl(double valueMl) {
+    if (valueMl >= 1) {
+      return '${valueMl.toStringAsFixed(2)} mL';
+    }
+    return '${(valueMl * 1000).toStringAsFixed(1)} µL';
   }
 
   double correctedAbsorbance(WesternSampleRow row) {
@@ -660,6 +840,9 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
 
   Future<void> exportToExcel() async {
     try {
+      final resolvingRecipe = isHandCast ? calculateResolvingRecipe() : null;
+      final stackingRecipe = isHandCast ? calculateStackingRecipe() : null;
+
       final path = await WesternBlotExcelService.export(
         experimentId: experimentIdController.text.trim(),
         operatorName: operatorController.text.trim(),
@@ -681,6 +864,40 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
         loadingProteinAmountUg: loadingProteinAmountUg,
         gelType: selectedGelType,
         gelPercent: gelPercent,
+        gelPreparationType: selectedGelPreparationType,
+        gradientRange: isPrecast ? selectedGradientRange : '',
+        gelThickness: selectedGelThickness,
+        combTeeth: selectedCombTeeth,
+        gelCount: gelCount,
+        resolvingPercent: isHandCast ? resolvingPercent : 0,
+        stackingPercent: isHandCast ? stackingPercent : 0,
+        resolvingVolumePerGelMl: isHandCast ? resolvingVolumePerGelMl : 0,
+        stackingVolumePerGelMl: isHandCast ? stackingVolumePerGelMl : 0,
+        gelExtraPercent: isHandCast ? gelExtraPercent : 0,
+        resolvingTotalMl: isHandCast ? resolvingTotalMl : 0,
+        stackingTotalMl: isHandCast ? stackingTotalMl : 0,
+        resolvingRecipe: resolvingRecipe == null
+            ? null
+            : {
+                'totalMl': resolvingRecipe.totalMl,
+                'acrylamideMl': resolvingRecipe.acrylamideMl,
+                'trisMl': resolvingRecipe.trisMl,
+                'sdsMl': resolvingRecipe.sdsMl,
+                'apsMl': resolvingRecipe.apsMl,
+                'temedMl': resolvingRecipe.temedMl,
+                'waterMl': resolvingRecipe.waterMl,
+              },
+        stackingRecipe: stackingRecipe == null
+            ? null
+            : {
+                'totalMl': stackingRecipe.totalMl,
+                'acrylamideMl': stackingRecipe.acrylamideMl,
+                'trisMl': stackingRecipe.trisMl,
+                'sdsMl': stackingRecipe.sdsMl,
+                'apsMl': stackingRecipe.apsMl,
+                'temedMl': stackingRecipe.temedMl,
+                'waterMl': stackingRecipe.waterMl,
+              },
         transferMethod: selectedTransferMethod,
         membrane: selectedMembrane,
         transferCondition: transferConditionController.text.trim(),
@@ -943,6 +1160,15 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
               '${loadingProteinAmountUg.toStringAsFixed(2)} µg/lane',
             ),
             infoRow('Gel type', selectedGelType),
+            infoRow('Gel preparation', selectedGelPreparationType),
+            if (isPrecast) infoRow('Gradient range', selectedGradientRange),
+            if (isHandCast)
+              infoRow(
+                'Resolving / stacking',
+                '${resolvingPercent.toStringAsFixed(1)}% / ${stackingPercent.toStringAsFixed(1)}%',
+              ),
+            infoRow('Thickness', selectedGelThickness),
+            infoRow('Comb teeth', selectedCombTeeth),
             infoRow('Gel percentage', '${gelPercent.toStringAsFixed(1)} %'),
             infoRow('Transfer method', selectedTransferMethod),
             infoRow('Membrane', selectedMembrane),
@@ -1121,6 +1347,41 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
         item(Colors.red.shade100, 'Invalid curve result'),
         item(Colors.grey.shade200, 'No BCA result'),
       ],
+    );
+  }
+
+  Widget buildGelRecipeCard({
+    required String title,
+    required String trisLabel,
+    required GelMixRecipe recipe,
+  }) {
+    return Card(
+      color: Colors.grey.shade100,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            infoRow('Total volume', formatMlOrUl(recipe.totalMl)),
+            infoRow('30% Acrylamide/Bis', formatMlOrUl(recipe.acrylamideMl)),
+            infoRow(trisLabel, formatMlOrUl(recipe.trisMl)),
+            infoRow('10% SDS', formatMlOrUl(recipe.sdsMl)),
+            infoRow('10% APS', formatMlOrUl(recipe.apsMl)),
+            infoRow('TEMED', formatMlOrUl(recipe.temedMl)),
+            infoRow('DW', formatMlOrUl(recipe.waterMl)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1553,6 +1814,150 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
                 },
               ),
               const SizedBox(height: 12),
+              buildDropdownField(
+                label: 'Gel preparation',
+                value: selectedGelPreparationType,
+                items: const [
+                  'Mini hand-cast',
+                  'Gradient precast',
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    selectedGelPreparationType = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              if (isPrecast) ...[
+                buildDropdownField(
+                  label: 'Gradient range',
+                  value: selectedGradientRange,
+                  items: const [
+                    '4-12%',
+                    '4-15%',
+                    '4-20%',
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() {
+                      selectedGradientRange = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 12),
+              ],
+              buildDropdownField(
+                label: 'Gel thickness',
+                value: selectedGelThickness,
+                items: const [
+                  '0.75 mm',
+                  '1.0 mm',
+                  '1.5 mm',
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    selectedGelThickness = value;
+                    applyDefaultGelVolumes();
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              buildDropdownField(
+                label: 'Comb teeth',
+                value: selectedCombTeeth,
+                items: const [
+                  '10',
+                  '15',
+                ],
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    selectedCombTeeth = value;
+                    applyDefaultGelVolumes();
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              if (isHandCast) ...[
+                buildTextField(
+                  label: 'Number of gels',
+                  controller: gelCountController,
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Resolving gel (%)',
+                  controller: resolvingPercentController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Stacking gel (%)',
+                  controller: stackingPercentController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Resolving volume per gel (mL)',
+                  controller: resolvingVolumePerGelController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Stacking volume per gel (mL)',
+                  controller: stackingVolumePerGelController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Extra (%)',
+                  controller: gelExtraPercentController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Acrylamide stock (%)',
+                  controller: acrylamideStockPercentController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Tris-HCl stock for resolving (M, pH 8.8)',
+                  controller: trisResolvingStockController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'Tris-HCl stock for stacking (M, pH 6.8)',
+                  controller: trisStackingStockController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'SDS stock (%)',
+                  controller: sdsStockPercentController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+                buildTextField(
+                  label: 'APS stock (%)',
+                  controller: apsStockPercentController,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 12),
+              ],
               buildTextField(
                 label: 'Loading protein amount per lane (µg)',
                 controller: proteinAmountController,
@@ -1561,7 +1966,9 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
               ),
               const SizedBox(height: 12),
               buildTextField(
-                label: 'Gel percentage (%)',
+                label: isHandCast
+                    ? 'Default gel percentage (%)'
+                    : 'Representative target band gel percentage (%)',
                 controller: gelPercentController,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
@@ -1797,6 +2204,45 @@ class _WesternBlotTemplatePageState extends State<WesternBlotTemplatePage> {
               buildSummaryCard(),
               const SizedBox(height: 12),
 
+              if (isHandCast) ...[
+                buildSectionTitle('SDS-PAGE Gel Recipe'),
+                const SizedBox(height: 8),
+                buildGelRecipeCard(
+                  title: 'Resolving gel',
+                  trisLabel: 'Tris-HCl pH 8.8',
+                  recipe: calculateResolvingRecipe(),
+                ),
+                const SizedBox(height: 12),
+                buildGelRecipeCard(
+                  title: 'Stacking gel',
+                  trisLabel: 'Tris-HCl pH 6.8',
+                  recipe: calculateStackingRecipe(),
+                ),
+                const SizedBox(height: 20),
+              ] else ...[
+                buildSectionTitle('SDS-PAGE Gel Info'),
+                const SizedBox(height: 8),
+                Card(
+                  color: Colors.grey.shade100,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        infoRow('Gel preparation', selectedGelPreparationType),
+                        infoRow('Gradient range', selectedGradientRange),
+                        infoRow('Thickness', selectedGelThickness),
+                        infoRow('Comb teeth', selectedCombTeeth),
+                        infoRow(
+                          'Note',
+                          'Precast gel은 recipe 계산 없이 선택 정보만 기록',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+
               buildSectionTitle('Microplate BCA Summary'),
               const SizedBox(height: 8),
               buildBcaProtocolCard(),
@@ -1943,4 +2389,24 @@ class WesternStandardRow {
       'averageAbsorbance': averageAbsorbance,
     };
   }
+}
+
+class GelMixRecipe {
+  final double totalMl;
+  final double acrylamideMl;
+  final double trisMl;
+  final double sdsMl;
+  final double apsMl;
+  final double temedMl;
+  final double waterMl;
+
+  const GelMixRecipe({
+    required this.totalMl,
+    required this.acrylamideMl,
+    required this.trisMl,
+    required this.sdsMl,
+    required this.apsMl,
+    required this.temedMl,
+    required this.waterMl,
+  });
 }

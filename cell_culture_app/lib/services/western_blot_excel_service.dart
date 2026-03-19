@@ -38,6 +38,20 @@ class WesternBlotExcelService {
     required double loadingProteinAmountUg,
     required String gelType,
     required double gelPercent,
+    required String gelPreparationType,
+    required String gradientRange,
+    required String gelThickness,
+    required String combTeeth,
+    required int gelCount,
+    required double resolvingPercent,
+    required double stackingPercent,
+    required double resolvingVolumePerGelMl,
+    required double stackingVolumePerGelMl,
+    required double gelExtraPercent,
+    required double resolvingTotalMl,
+    required double stackingTotalMl,
+    required Map<String, dynamic>? resolvingRecipe,
+    required Map<String, dynamic>? stackingRecipe,
     required String transferMethod,
     required String membrane,
     required String transferCondition,
@@ -64,15 +78,26 @@ class WesternBlotExcelService {
   }) async {
     final excel = Excel.createExcel();
 
+    final defaultSheet = excel.getDefaultSheet();
+
     final overviewSheet = excel['Overview'];
     final standardSheet = excel['BCA Standards'];
     final sampleSheet = excel['BCA Samples'];
     final processSheet = excel['Process Summary'];
+    final gelSheet = excel['Gel Recipe'];
+
+    if (defaultSheet != null &&
+        defaultSheet != 'Overview' &&
+        defaultSheet != 'BCA Standards' &&
+        defaultSheet != 'BCA Samples' &&
+        defaultSheet != 'Process Summary' &&
+        defaultSheet != 'Gel Recipe') {
+      excel.delete(defaultSheet);
+    }
 
     final standardReplicateCount =
         _replicateCountFromMode(standardReplicateMode);
-    final sampleReplicateCount =
-        _replicateCountFromMode(sampleReplicateMode);
+    final sampleReplicateCount = _replicateCountFromMode(sampleReplicateMode);
 
     String wellLabel(int count) => count == 1 ? '1 well' : '$count wells';
 
@@ -130,6 +155,14 @@ class WesternBlotExcelService {
       ['Standard intercept', standardIntercept],
       ['Standard unit', standardUnit],
       ['Loading amount (µg)', loadingProteinAmountUg],
+      ['Gel type', gelType],
+      ['Gel preparation', gelPreparationType],
+      ['Gradient range', gradientRange.isEmpty ? '-' : gradientRange],
+      ['Gel thickness', gelThickness],
+      ['Comb teeth', combTeeth],
+      ['Gel count', gelCount],
+      ['Resolving gel (%)', resolvingPercent],
+      ['Stacking gel (%)', stackingPercent],
       ['Notes', notes],
     ]);
 
@@ -137,7 +170,18 @@ class WesternBlotExcelService {
       ['Field', 'Value'],
       ['Lysis buffer', lysisBuffer],
       ['Gel type', gelType],
+      ['Gel preparation', gelPreparationType],
+      ['Gradient range', gradientRange.isEmpty ? '-' : gradientRange],
       ['Gel percent', gelPercent],
+      ['Gel thickness', gelThickness],
+      ['Comb teeth', combTeeth],
+      ['Resolving gel (%)', resolvingPercent],
+      ['Stacking gel (%)', stackingPercent],
+      ['Resolving volume per gel (mL)', resolvingVolumePerGelMl],
+      ['Stacking volume per gel (mL)', stackingVolumePerGelMl],
+      ['Extra (%)', gelExtraPercent],
+      ['Resolving total (mL)', resolvingTotalMl],
+      ['Stacking total (mL)', stackingTotalMl],
       ['Transfer method', transferMethod],
       ['Membrane', membrane],
       ['Transfer condition', transferCondition],
@@ -254,12 +298,65 @@ class WesternBlotExcelService {
       writeRow(sampleSheet, i + 1, excelRow);
     }
 
+    writeKeyValueRows(gelSheet, 0, [
+      ['Field', 'Value'],
+      ['Gel type', gelType],
+      ['Gel preparation', gelPreparationType],
+      ['Gradient range', gradientRange.isEmpty ? '-' : gradientRange],
+      ['Gel thickness', gelThickness],
+      ['Comb teeth', combTeeth],
+      ['Gel count', gelCount],
+    ]);
+
+    if (gelPreparationType == 'Mini hand-cast') {
+      writeKeyValueRows(gelSheet, 9, [
+        ['Hand-cast input', ''],
+        ['Resolving gel (%)', resolvingPercent],
+        ['Stacking gel (%)', stackingPercent],
+        ['Resolving volume per gel (mL)', resolvingVolumePerGelMl],
+        ['Stacking volume per gel (mL)', stackingVolumePerGelMl],
+        ['Extra (%)', gelExtraPercent],
+        ['Resolving total (mL)', resolvingTotalMl],
+        ['Stacking total (mL)', stackingTotalMl],
+      ]);
+
+      writeKeyValueRows(gelSheet, 19, [
+        ['Resolving gel recipe', ''],
+        ['30% Acrylamide/Bis (mL)', resolvingRecipe?['acrylamideMl'] ?? 0],
+        ['Tris-HCl pH 8.8 (mL)', resolvingRecipe?['trisMl'] ?? 0],
+        ['10% SDS (mL)', resolvingRecipe?['sdsMl'] ?? 0],
+        ['10% APS (mL)', resolvingRecipe?['apsMl'] ?? 0],
+        ['TEMED (mL)', resolvingRecipe?['temedMl'] ?? 0],
+        ['DW (mL)', resolvingRecipe?['waterMl'] ?? 0],
+        ['Total (mL)', resolvingRecipe?['totalMl'] ?? 0],
+      ]);
+
+      writeKeyValueRows(gelSheet, 29, [
+        ['Stacking gel recipe', ''],
+        ['30% Acrylamide/Bis (mL)', stackingRecipe?['acrylamideMl'] ?? 0],
+        ['Tris-HCl pH 6.8 (mL)', stackingRecipe?['trisMl'] ?? 0],
+        ['10% SDS (mL)', stackingRecipe?['sdsMl'] ?? 0],
+        ['10% APS (mL)', stackingRecipe?['apsMl'] ?? 0],
+        ['TEMED (mL)', stackingRecipe?['temedMl'] ?? 0],
+        ['DW (mL)', stackingRecipe?['waterMl'] ?? 0],
+        ['Total (mL)', stackingRecipe?['totalMl'] ?? 0],
+      ]);
+    } else {
+      writeKeyValueRows(gelSheet, 9, [
+        ['Precast note', ''],
+        ['Note', 'Precast gel은 recipe 계산 없이 선택 정보만 기록'],
+      ]);
+    }
+
     for (int i = 0; i < 14; i++) {
       overviewSheet.setColumnWidth(i, 24);
       processSheet.setColumnWidth(i, 24);
       standardSheet.setColumnWidth(i, 18);
       sampleSheet.setColumnWidth(i, 20);
     }
+
+    gelSheet.setColumnWidth(0, 32);
+    gelSheet.setColumnWidth(1, 24);
 
     final dir = await getApplicationDocumentsDirectory();
     final safeExperimentId =
