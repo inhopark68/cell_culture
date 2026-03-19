@@ -22,6 +22,10 @@ class CellCultureRecommendedDensityCard extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final description = selectedCellLine != null
+        ? '${selectedCellLine!.primaryName} / $selectedAssay 기준 추천값'
+        : '$selectedAssay 기본 추천값';
+
     return Card(
       color: Colors.orange.shade50,
       elevation: 0,
@@ -44,9 +48,7 @@ class CellCultureRecommendedDensityCard extends StatelessWidget {
                   Text('${recommendedDensity!.toStringAsFixed(0)} cells/cm²'),
                   const SizedBox(height: 6),
                   Text(
-                    selectedCellLine != null
-                        ? '${selectedCellLine!.name} / $selectedAssay 기준 추천값'
-                        : '$selectedAssay 기본 추천값',
+                    description,
                     style: TextStyle(
                       color: Colors.grey.shade700,
                       fontSize: 13,

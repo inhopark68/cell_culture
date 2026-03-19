@@ -24,5 +24,18 @@
     "disease": "Transformed embryonic kidney",
     "isMisidentified": false,
     "misidentifiedNote": null
+  },
+  {
+    "primaryName": "HepG2",
+    "synonyms": ["Hep G2", "HEPG2"],
+    "source": "ATCC",
+    "catalogNumber": "",
+    "cvclId": "CVCL_0027",
+    "rrid": null,
+    "species": "Human",
+    "tissue": "Liver",
+    "disease": "Hepatocellular carcinoma",
+    "isMisidentified": false,
+    "misidentifiedNote": null
   }
 ]

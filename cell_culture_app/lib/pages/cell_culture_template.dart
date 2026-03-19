@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/cell_culture_form_data.dart';
 import '../models/cell_culture_summary.dart';
 import '../models/cell_line_option.dart';
+import '../models/seeding_input_mode.dart';
 import '../services/cell_culture_excel_service.dart';
 import '../services/cell_culture_layout_service.dart';
 import '../services/cell_line_catalog_service.dart';
@@ -19,8 +19,6 @@ import '../widgets/cell_culture_recommended_density_card.dart';
 import '../widgets/cell_culture_result_card.dart';
 import '../widgets/cell_culture_selected_cell_line_card.dart';
 import '../widgets/cell_culture_suspension_card.dart';
-import '../models/seeding_input_mode.dart';
-
 
 class CellCultureTemplatePage extends StatefulWidget {
   const CellCultureTemplatePage({super.key});
@@ -31,6 +29,8 @@ class CellCultureTemplatePage extends StatefulWidget {
 }
 
 class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
+  static const int maxCellLineSuggestions = 300;
+
   final _formKey = GlobalKey<FormState>();
   final controllerVm = CellCultureTemplateController();
 
@@ -67,7 +67,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
   String selectedSourceFilter = 'All';
   String selectedSpeciesFilter = 'All';
 
-  // final List<String> sourceFilters = ['All', 'ATCC', 'KCLB'];
   final List<String> sourceFilters = [
     'All',
     'ATCC',
@@ -78,7 +77,9 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
     'RIKEN BRC',
     'CBCAS',
     'NCCS',
+    'Custom',
   ];
+
   final List<String> speciesFilters = [
     'All',
     'Human',
@@ -248,10 +249,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
               ? recommended
               : recommended * selectedWellBasisArea;
 
-      seedingInputController.text =
-          selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
-              ? displayValue.toStringAsFixed(0)
-              : displayValue.toStringAsFixed(0);
+      seedingInputController.text = displayValue.toStringAsFixed(0);
     }
   }
 
@@ -263,10 +261,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
               ? density
               : density * selectedWellBasisArea;
 
-      seedingInputController.text =
-          selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
-              ? displayValue.toStringAsFixed(0)
-              : displayValue.toStringAsFixed(0);
+      seedingInputController.text = displayValue.toStringAsFixed(0);
     }
   }
 
@@ -411,7 +406,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
       return a.primaryName.compareTo(b.primaryName);
     });
 
-    return filtered.take(20);
+    return filtered.take(maxCellLineSuggestions);
   }
 
   Uri? buildCellLineSourceUri(CellLineOption option) {
@@ -750,7 +745,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                 const SizedBox(height: 20),
                 buildSectionTitle('Seeding Conditions'),
                 const SizedBox(height: 8),
-
                 DropdownButtonFormField<SeedingInputMode>(
                   value: selectedSeedingInputMode,
                   decoration: const InputDecoration(
@@ -795,7 +789,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   },
                 ),
                 const SizedBox(height: 12),
-
                 DropdownButtonFormField<String>(
                   value: selectedWellBasisWare,
                   decoration: const InputDecoration(
@@ -834,7 +827,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                           : null,
                 ),
                 const SizedBox(height: 12),
-
                 buildTextField(
                   label: selectedSeedingInputMode == SeedingInputMode.cellsPerCm2
                       ? 'Seeding density (cells/cm²)'
@@ -852,13 +844,14 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                   onChanged: (_) => onCalculationInputChanged(),
                 ),
                 const SizedBox(height: 8),
-
                 if (normalizedSeedingDensity != null)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -867,7 +860,6 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                       'Actual culture ware: ${actualCellsPerCultureUnit?.toStringAsFixed(0) ?? '-'} cells/well ($selectedWare)',
                     ),
                   ),
-
                 const SizedBox(height: 12),
                 buildTextField(
                   label: 'Sample count',
@@ -992,10 +984,7 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                             : recommendedDensity! * selectedWellBasisArea;
 
                     seedingInputController.text =
-                        selectedSeedingInputMode ==
-                                SeedingInputMode.cellsPerCm2
-                            ? displayValue.toStringAsFixed(0)
-                            : displayValue.toStringAsFixed(0);
+                        displayValue.toStringAsFixed(0);
 
                     setState(() {});
                   },
@@ -1004,8 +993,8 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                 buildSectionTitle('Calculated Result'),
                 const SizedBox(height: 8),
                 CellCultureResultCard(
-                  form: formData,
-                  summary: summary,
+                  form: data,
+                  summary: result,
                   selectedCellLine: selectedCellLine,
                   selectedSeedingInputMode: selectedSeedingInputMode,
                   selectedWellBasisWare: selectedWellBasisWare,
@@ -1016,8 +1005,8 @@ class _CellCultureTemplatePageState extends State<CellCultureTemplatePage> {
                 buildSectionTitle('Suspension Preparation'),
                 const SizedBox(height: 8),
                 CellCultureSuspensionCard(
-                  form: formData,
-                  summary: summary,
+                  form: data,
+                  summary: result,
                   selectedSeedingInputMode: selectedSeedingInputMode,
                   selectedWellBasisWare: selectedWellBasisWare,
                   basisCellsPerWell: basisCellsPerWell,

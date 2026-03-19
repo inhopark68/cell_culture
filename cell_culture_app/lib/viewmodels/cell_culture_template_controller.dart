@@ -61,6 +61,8 @@ class CellCultureTemplateController {
     'D-17': 50000,
     'CRFK': 40000,
     'Fcwf-4': 40000,
+    'HepG2': 45000,
+    'MyCustomCell': 35000,
   };
 
   final Map<String, Map<String, double>> recommendedDensityBySpeciesAndAssay = {

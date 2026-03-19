@@ -22,9 +22,13 @@ class CellCultureSelectedCellLineCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(child: Text(label)),
+          Expanded(
+            flex: 4,
+            child: Text(label),
+          ),
           const SizedBox(width: 12),
           Expanded(
+            flex: 6,
             child: Text(
               value,
               textAlign: TextAlign.right,
@@ -36,9 +40,20 @@ class CellCultureSelectedCellLineCard extends StatelessWidget {
     );
   }
 
+  String _displayOrDash(String? value) {
+    if (value == null || value.trim().isEmpty) return '-';
+    return value;
+  }
+
+  String _displayListOrDash(List<String> values) {
+    if (values.isEmpty) return '-';
+    return values.join(', ');
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (selectedCellLine == null) return const SizedBox.shrink();
+    final cellLine = selectedCellLine;
+    if (cellLine == null) return const SizedBox.shrink();
 
     return Card(
       color: Colors.grey.shade50,
@@ -47,12 +62,25 @@ class CellCultureSelectedCellLineCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _row('Selected', selectedCellLine!.name),
-            _row('Source', selectedCellLine!.source),
-            _row('Catalog No.', selectedCellLine!.catalogNumber),
-            _row('Species', selectedCellLine!.species ?? '-'),
-            _row('Tissue', selectedCellLine!.tissue ?? '-'),
-            _row('Disease', selectedCellLine!.disease ?? '-'),
+            _row('Selected', cellLine.primaryName),
+            _row('Display label', cellLine.displayLabel),
+            _row('Source', cellLine.source),
+            _row('Catalog No.', cellLine.catalogNumber),
+            _row('Synonyms', _displayListOrDash(cellLine.synonyms)),
+            _row('CVCL ID', _displayOrDash(cellLine.cvclId)),
+            _row('RRID', _displayOrDash(cellLine.rrid)),
+            _row('Species', _displayOrDash(cellLine.species)),
+            _row('Tissue', _displayOrDash(cellLine.tissue)),
+            _row('Disease', _displayOrDash(cellLine.disease)),
+            _row(
+              'Misidentified',
+              cellLine.isMisidentified ? 'Yes' : 'No',
+            ),
+            if (cellLine.isMisidentified)
+              _row(
+                'Misidentified note',
+                _displayOrDash(cellLine.misidentifiedNote),
+              ),
             _row('Source filter', selectedSourceFilter),
             _row('Species filter', selectedSpeciesFilter),
             const SizedBox(height: 8),

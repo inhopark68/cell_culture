@@ -18,6 +18,20 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
     required this.onChanged,
   });
 
+  String _buildSubtitle(CellLineOption option) {
+    final parts = <String>[
+      '${option.source} ${option.catalogNumber}',
+      if (option.species != null && option.species!.trim().isNotEmpty)
+        option.species!,
+      if (option.tissue != null && option.tissue!.trim().isNotEmpty)
+        option.tissue!,
+      if (option.disease != null && option.disease!.trim().isNotEmpty)
+        option.disease!,
+    ];
+
+    return parts.join(' • ');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -93,7 +107,7 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(
                 maxWidth: 700,
-                maxHeight: 320,
+                maxHeight: 500,
               ),
               child: ListView.separated(
                 padding: EdgeInsets.zero,
@@ -102,15 +116,11 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, index) {
                   final option = optionList[index];
+
                   return ListTile(
                     dense: true,
-                    title: Text(option.name),
-                    subtitle: Text(
-                      '${option.source} ${option.catalogNumber}'
-                      '${option.species != null ? ' • ${option.species}' : ''}'
-                      '${option.tissue != null ? ' • ${option.tissue}' : ''}'
-                      '${option.disease != null ? ' • ${option.disease}' : ''}',
-                    ),
+                    title: Text(option.primaryName),
+                    subtitle: Text(_buildSubtitle(option)),
                     trailing: option.source.toUpperCase() == 'ATCC'
                         ? const Icon(Icons.public, size: 18)
                         : const Icon(Icons.biotech, size: 18),

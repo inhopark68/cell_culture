@@ -3,6 +3,8 @@
   { "name": "HEK293", "source": "ATCC", "catalogNumber": "CRL-1573", "species": "Human", "tissue": "Kidney", "disease": "Transformed embryonic kidney" },
   { "name": "A549", "source": "ATCC", "catalogNumber": "CCL-185", "species": "Human", "tissue": "Lung", "disease": "Carcinoma" },
   { "name": "MCF-7", "source": "ATCC", "catalogNumber": "HTB-22", "species": "Human", "tissue": "Breast", "disease": "Adenocarcinoma" },
+  { "name": "HepG2", "source": "ATCC", "catalogNumber": "HB-8065", "species": "Human", "tissue": "Liver", "disease": "Hepatocellular carcinoma" },
+  { "name": "MyCustomCell", "source": "Custom", "catalogNumber": "LAB-001", "species": "Human", "tissue": "Lung", "disease": "Adenocarcinoma" }
 
   { "name": "NIH/3T3", "source": "ATCC", "catalogNumber": "CRL-1658", "species": "Mouse", "tissue": "Embryo", "disease": null },
   { "name": "L929", "source": "ATCC", "catalogNumber": "CCL-1", "species": "Mouse", "tissue": "Connective tissue", "disease": null },
