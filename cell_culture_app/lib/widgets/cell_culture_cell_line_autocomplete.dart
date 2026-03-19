@@ -5,6 +5,7 @@ import '../models/cell_line_option.dart';
 class CellCultureCellLineAutocomplete extends StatelessWidget {
   final bool isLoading;
   final String selectedLabel;
+  final TextEditingController controller;
   final Iterable<CellLineOption> Function(String query) optionsBuilder;
   final ValueChanged<CellLineOption> onSelected;
   final ValueChanged<String> onChanged;
@@ -13,6 +14,7 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
     super.key,
     required this.isLoading,
     required this.selectedLabel,
+    required this.controller,
     required this.optionsBuilder,
     required this.onSelected,
     required this.onChanged,
@@ -65,6 +67,10 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
         FocusNode focusNode,
         VoidCallback onFieldSubmitted,
       ) {
+        if (controller.text != textEditingController.text) {
+          textEditingController.value = controller.value;
+        }
+
         return TextField(
           controller: textEditingController,
           focusNode: focusNode,
@@ -74,7 +80,10 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
             border: OutlineInputBorder(),
             prefixIcon: Icon(Icons.search),
           ),
-          onChanged: onChanged,
+          onChanged: (value) {
+            controller.value = textEditingController.value;
+            onChanged(value);
+          },
         );
       },
       optionsViewBuilder: (
@@ -93,7 +102,10 @@ class CellCultureCellLineAutocomplete extends StatelessWidget {
                 width: 420,
                 child: ListTile(
                   title: const Text('검색 결과 없음'),
-                  subtitle: const Text('다른 이름 또는 catalog 번호로 검색해보세요.'),
+                  subtitle: const Text(
+                    '다른 이름 또는 catalog 번호로 검색해보세요.\n'
+                    '필요하면 Source/Species filter를 All로 바꿔보세요.',
+                  ),
                 ),
               ),
             ),
